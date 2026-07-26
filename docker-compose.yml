@@ -1,0 +1,42 @@
+services:
+
+    postgres:
+        image: postgres:16-alpine
+        container_name: postgresSC
+        restart: unless-stopped
+        volumes:
+            - postgres_data:/var/lib/postgresql/data   
+        environment:
+            POSTGRES_DB: sportconnectdb
+            POSTGRES_USER: ${POSTGRES_USER}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+        ports:
+            - "5432:5432"
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d sportconnectdb"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+            start_period: 5s
+        
+        
+      
+    pgadmin:
+        image: dpage/pgadmin4:latest
+        container_name: pgadmin
+        restart: unless-stopped
+        volumes:
+            - pgadmin_working_dir:/var/lib/pgadmin
+            - pgadmin_config_dir:/pgadmin4 
+        environment:
+            PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+            PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+        depends_on:
+            postgres:
+                condition: service_healthy
+        ports:
+            - "5050:80" 
+volumes:
+    postgres_data:
+    pgadmin_working_dir:
+    pgadmin_config_dir:
