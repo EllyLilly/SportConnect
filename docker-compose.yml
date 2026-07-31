@@ -1,7 +1,7 @@
 services:
 
     postgres:
-        image: postgres:16-alpine
+        image: postgis/postgis:16-3.4-alpine
         container_name: postgresSC
         restart: unless-stopped
         volumes:
@@ -11,7 +11,7 @@ services:
             POSTGRES_USER: ${POSTGRES_USER}
             POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
         ports:
-            - "5432:5432"
+            - "5433:5432"
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d sportconnectdb"]
             interval: 5s
