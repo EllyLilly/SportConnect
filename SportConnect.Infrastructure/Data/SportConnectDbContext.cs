@@ -19,6 +19,7 @@ namespace SportConnect.Infrastructure.Data
         public DbSet<Sport> Sports { get; set; }
         public DbSet<MeetingParticipant> MeetingParticipants { get; set; }
         public DbSet<Message> Messages { get; set; }
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

@@ -11,5 +11,7 @@ namespace SportConnect.Infrastructure.Entities
     {
         public int RadiusMeters { get; set; } = 3000;
         public string? SkillLevel { get; set; }
+
+        public long? TelegramChatId { get; set; }
     }
 }

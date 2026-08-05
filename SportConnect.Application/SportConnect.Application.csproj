@@ -8,6 +8,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SportConnect.Core\SportConnect.Core.csproj" />
+    <ProjectReference Include="..\SportConnect.Infrastructure\SportConnect.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.3" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.22.0" />
   </ItemGroup>
 
 </Project>
