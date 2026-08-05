@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.ModelBinding.Binders;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SportConnect.Application.DTOs.Auth;
+using SportConnect.Application.Exceptions;
 using SportConnect.Infrastructure.Data;
 using SportConnect.Infrastructure.Entities;
 using System;
@@ -37,13 +38,13 @@ namespace SportConnect.Application.Services
             var existingUserByEmail = await _userManager.FindByEmailAsync(dto.Email);
             if (existingUserByEmail != null)
             {
-                throw new Exception("Пользователь с таким email уже существует");
+                throw new ConflictException("Пользователь с таким email уже существует");
             }
 
             var existingUserByName = await _userManager.FindByNameAsync(dto.UserName);
             if (existingUserByName != null)
             {
-                throw new Exception("Пользователь с таким именем уже существует");
+                throw new ConflictException("Пользователь с таким именем уже существует");
             }
 
             var newUser = new User
@@ -59,7 +60,7 @@ namespace SportConnect.Application.Services
             if (!result.Succeeded)
             {
                 var errors = string.Join(", ", result.Errors.Select(e => e.Description));
-                throw new Exception("Ошибка при создании пользователя: " + errors);
+                throw new ValidationException("Ошибка при создании пользователя: " + errors);
             }
 
             //генерация access-токена для входа
@@ -98,14 +99,14 @@ namespace SportConnect.Application.Services
 
             if (user == null)
             {
-                throw new Exception("Неверный email или пароль");
+                throw new ValidationException("Неверный email или пароль");
             }
 
             //проверка пароля
             bool passwordCorrect = await _userManager.CheckPasswordAsync(user, dto.Password);
 
             if(!passwordCorrect) {
-                throw new Exception("Неверный email или пароль");
+                throw new ValidationException("Неверный email или пароль");
             }
 
             //генерация access-токена для входа
@@ -150,7 +151,7 @@ namespace SportConnect.Application.Services
             var token = await _db.RefreshTokens.FirstOrDefaultAsync(rt => rt.Token == refreshToken);
             if (token == null || token.IsRevoked || token.ExpiresAt < DateTime.UtcNow)
             {
-                throw new Exception("Неверный токен");
+                throw new ValidationException("Неверный токен");
             }
 
             var user = await _userManager.FindByIdAsync(token.UserId.ToString());
