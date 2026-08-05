@@ -8,10 +8,10 @@ namespace SportConnect.Core.Entities
 {
     public class BaseEntity
     {
-        public Guid Id { get; init; } = Guid.NewGuid();
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public Guid Id { get; set; }
+        public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
-        public bool IsDeleted = false;
+        public bool IsDeleted { get; set; } = false;
         public DateTime? DeletedAt { get; set; }
 
     }

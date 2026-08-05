@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using SportConnect.Infrastructure.Data.Seeding;
 using SportConnect.Infrastructure.Entities;
 using System;
 using System.Collections.Generic;
@@ -23,6 +24,8 @@ namespace SportConnect.Infrastructure.Data
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
+            SportSeeder.Seed(builder);
+
             base.OnModelCreating(builder);
 
             builder.Entity<Meeting>()
