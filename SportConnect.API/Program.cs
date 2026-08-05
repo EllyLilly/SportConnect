@@ -72,6 +72,7 @@ builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddHttpContextAccessor();
 
+builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddControllers();
 
 // Swagger
