@@ -68,7 +68,7 @@ builder.Services.AddAuthentication(options =>
 });
 
 // Сервисы
-builder.Services.AddScoped<JwtService>();
+builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddHttpContextAccessor();
 
@@ -132,7 +132,6 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapControllers();
 
 app.UseSerilogRequestLogging(options =>
 {
@@ -142,5 +141,7 @@ app.UseSerilogRequestLogging(options =>
         diagnosticContext.Set("UserId", userId ?? "anonymous");
     };
 });
+
+app.MapControllers();
 
 app.Run();

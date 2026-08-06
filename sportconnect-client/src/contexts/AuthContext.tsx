@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import api from '../api/axios';
 
 interface User {
@@ -18,6 +18,30 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Проверка токена при загрузке приложения
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await api.get('/auth/me');
+        setUser({ userName: response.data.userName, email: response.data.email });
+      } catch {
+        localStorage.removeItem('accessToken');
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
 
   const login = async (email: string, password: string) => {
     const response = await api.post('/auth/login', { email, password });
@@ -37,6 +61,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('accessToken');
     setUser(null);
   };
+
+  if (loading) {
+    return <div>Загрузка...</div>;
+  }
 
   return (
     <AuthContext.Provider

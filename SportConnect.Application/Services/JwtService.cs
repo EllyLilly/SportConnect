@@ -12,7 +12,7 @@ using SportConnect.Infrastructure.Entities;
 
 namespace SportConnect.Application.Services
 {
-    public class JwtService
+    public class JwtService : IJwtService
     {
         private readonly IConfiguration _configuration;
 

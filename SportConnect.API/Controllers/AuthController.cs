@@ -1,7 +1,11 @@
-﻿using Microsoft.AspNetCore.Identity.Data;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using SportConnect.Application.DTOs.Auth;
 using SportConnect.Application.Services;
+using SportConnect.Infrastructure.Entities;
+using System.Security.Claims;
 
 namespace SportConnect.API.Controllers
 {
@@ -11,10 +15,12 @@ namespace SportConnect.API.Controllers
     {
 
         private readonly AuthService _authService;
+        private readonly UserManager<User> _userManager;
 
-        public AuthController(AuthService authService)
+        public AuthController(AuthService authService, UserManager<User> userManager)
         {
             _authService = authService;
+            _userManager = userManager;
         }
 
         //POST /api/auth/register
@@ -49,6 +55,28 @@ namespace SportConnect.API.Controllers
 
             var response = await _authService.RefreshTokenAsync(refreshToken);
             return Ok(response);
+        }
+
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<ActionResult<AuthResponseDto>> Me()
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var email = User.FindFirst(ClaimTypes.Email)?.Value;
+
+            if (userId == null)
+                return Unauthorized();
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                return Unauthorized();
+
+            return Ok(new AuthResponseDto
+            {
+                AccessToken = "",
+                UserName = user.UserName ?? "",
+                Email = user.Email ?? ""
+            });
         }
 
     }

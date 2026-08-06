@@ -19,12 +19,12 @@ namespace SportConnect.Application.Services
     {
         private readonly SportConnectDbContext _db;
 
-        private readonly JwtService _jwtService;
+        private readonly IJwtService _jwtService;
 
         private readonly UserManager<User> _userManager;
 
         private readonly IHttpContextAccessor _httpContextAccessor;
-        public AuthService(SportConnectDbContext db, JwtService jwtService, UserManager<User> userManager, IHttpContextAccessor httpContextAccessor)
+        public AuthService(SportConnectDbContext db, IJwtService jwtService, UserManager<User> userManager, IHttpContextAccessor httpContextAccessor)
         {
             _db = db;
             _jwtService = jwtService;
