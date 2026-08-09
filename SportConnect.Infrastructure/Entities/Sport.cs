@@ -7,9 +7,10 @@ using System.Threading.Tasks;
 
 namespace SportConnect.Infrastructure.Entities
 {
-    public class Sport : BaseEntity
+    public class Sport
     {
-        public string Name { get; set; }
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
         public string? Icon { get; set; }
         public string? Color { get; set; }
     }

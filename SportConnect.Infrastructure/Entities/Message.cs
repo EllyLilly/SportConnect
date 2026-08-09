@@ -7,13 +7,18 @@ using System.Threading.Tasks;
 
 namespace SportConnect.Infrastructure.Entities
 {
-    public class Message : BaseEntity
+    public class Message
     {
-        public string Content { get; set; }
-        public Guid SenderId { get; set; }
-        public User? Sender  { get; set; }
-        public Guid MeetingId   { get; set; }
-        public Meeting? Meeting { get; set; }
-        public DateTime SentAt { get; set; }
+        public Guid Id { get; set; }
+        public string Content { get; set; } = string.Empty;
+        public DateTime SentAt { get; set; } = DateTime.UtcNow;
+        public bool IsDeleted { get; set; }
+        public DateTime? DeletedAt { get; set; }
+
+        public Guid MeetingId { get; set; }
+        public Meeting Meeting { get; set; } = null!;
+
+        public Guid UserId { get; set; }
+        public User Sender { get; set; } = null!;
     }
 }

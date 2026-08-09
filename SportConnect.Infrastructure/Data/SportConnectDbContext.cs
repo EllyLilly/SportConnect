@@ -29,8 +29,9 @@ namespace SportConnect.Infrastructure.Data
 
             base.OnModelCreating(builder);
 
+            // --- UserSportPreference ---
             builder.Entity<UserSportPreference>()
-                .HasKey(usp => new { usp.UserId, usp.SportId});
+                .HasKey(usp => new { usp.UserId, usp.SportId });
 
             builder.Entity<UserSportPreference>()
                 .HasOne(usp => usp.User)
@@ -41,53 +42,89 @@ namespace SportConnect.Infrastructure.Data
                 .HasOne(usp => usp.Sport)
                 .WithMany()
                 .HasForeignKey(usp => usp.SportId);
-            
+
+            // --- Meeting ---
+            builder.Entity<Meeting>()
+                .HasKey(m => m.Id);
+
             builder.Entity<Meeting>()
                 .Property(m => m.Location)
                 .HasColumnType("geography (Point, 4326)");
 
-            // Meeting → Sport
             builder.Entity<Meeting>()
-                .HasOne<Sport>(m => m.Sport)
+                .HasOne(m => m.Sport)
                 .WithMany()
                 .HasForeignKey(m => m.SportId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Meeting → Creator
             builder.Entity<Meeting>()
-                .HasOne(m => m.Creator)
+                .HasOne(m => m.Author)
                 .WithMany()
-                .HasForeignKey(m => m.CreatorId)
+                .HasForeignKey(m => m.AuthorId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // MeetingParticipant → Meeting
+            builder.Entity<Meeting>()
+                .HasIndex(m => m.IsDeleted);
+
+            builder.Entity<Meeting>()
+                .HasIndex(m => m.Status);
+
+            builder.Entity<Meeting>()
+                .HasIndex(m => m.ScheduledAt);
+
+            builder.Entity<Meeting>()
+                .HasIndex(m => new { m.IsDeleted, m.Status, m.ScheduledAt });
+
+            builder.Entity<Meeting>()
+                .HasIndex(m => m.Location)
+                .HasMethod("GIST");
+
+            // Global query filter - не возвращаем удаленные
+            builder.Entity<Meeting>()
+                .HasQueryFilter(m => !m.IsDeleted);
+
+            builder.Entity<MeetingParticipant>()
+                .HasKey(mp => new { mp.MeetingId, mp.UserId });
+
             builder.Entity<MeetingParticipant>()
                 .HasOne(mp => mp.Meeting)
                 .WithMany(m => m.Participants)
                 .HasForeignKey(mp => mp.MeetingId);
 
-            // MeetingParticipant → User
             builder.Entity<MeetingParticipant>()
                 .HasOne(mp => mp.User)
                 .WithMany()
                 .HasForeignKey(mp => mp.UserId);
 
+            // Partial unique index - только для активных (не удаленных) записей
             builder.Entity<MeetingParticipant>()
                 .HasIndex(mp => new { mp.MeetingId, mp.UserId })
-                .IsUnique();
+                .IsUnique()
+                .HasFilter("IsDeleted = false");
 
-            // Message → Meeting
+            builder.Entity<MeetingParticipant>()
+                .HasIndex(mp => mp.MeetingId);
+
+            // Global query filter
+            builder.Entity<MeetingParticipant>()
+                .HasQueryFilter(mp => !mp.IsDeleted);
+
+            builder.Entity<Message>()
+                .HasKey(m => m.Id);
+
             builder.Entity<Message>()
                 .HasOne(m => m.Meeting)
                 .WithMany()
                 .HasForeignKey(m => m.MeetingId);
 
-            // Message → Sender
             builder.Entity<Message>()
                 .HasOne(m => m.Sender)
                 .WithMany()
-                .HasForeignKey(m => m.SenderId);
+                .HasForeignKey(m => m.UserId);
 
+            // Global query filter
+            builder.Entity<Message>()
+                .HasQueryFilter(m => !m.IsDeleted);
         }
     }
 }
