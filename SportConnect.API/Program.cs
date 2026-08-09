@@ -76,6 +76,8 @@ builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<ProfileService>();
+builder.Services.AddScoped<MeetingService>();
+builder.Services.AddValidatorsFromAssemblyContaining<CreateMeetingValidator>();
 builder.Services.AddValidatorsFromAssemblyContaining<UpdateProfileValidator>();
 builder.Services.AddControllers();
 

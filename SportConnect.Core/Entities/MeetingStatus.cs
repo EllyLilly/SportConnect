@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SportConnect.Infrastructure.Entities
+namespace SportConnect.Core.Entities
 {
     public enum MeetingStatus
     {
