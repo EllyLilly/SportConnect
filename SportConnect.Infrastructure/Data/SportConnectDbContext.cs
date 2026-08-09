@@ -21,6 +21,7 @@ namespace SportConnect.Infrastructure.Data
         public DbSet<MeetingParticipant> MeetingParticipants { get; set; }
         public DbSet<Message> Messages { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
+        public DbSet<UserSportPreference> UserSportPreferences { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -28,6 +29,19 @@ namespace SportConnect.Infrastructure.Data
 
             base.OnModelCreating(builder);
 
+            builder.Entity<UserSportPreference>()
+                .HasKey(usp => new { usp.UserId, usp.SportId});
+
+            builder.Entity<UserSportPreference>()
+                .HasOne(usp => usp.User)
+                .WithMany(u => u.SportPreferences)
+                .HasForeignKey(usp => usp.UserId);
+
+            builder.Entity<UserSportPreference>()
+                .HasOne(usp => usp.Sport)
+                .WithMany()
+                .HasForeignKey(usp => usp.SportId);
+            
             builder.Entity<Meeting>()
                 .Property(m => m.Location)
                 .HasColumnType("geography (Point, 4326)");

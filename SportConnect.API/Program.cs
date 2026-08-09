@@ -1,9 +1,11 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using SportConnect.API.Middleware;
+using SportConnect.API.Validators;
 using SportConnect.Application.Services;
 using SportConnect.Infrastructure.Data;
 using SportConnect.Infrastructure.Entities;
@@ -73,6 +75,8 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<CurrentUserService>();
+builder.Services.AddScoped<ProfileService>();
+builder.Services.AddValidatorsFromAssemblyContaining<UpdateProfileValidator>();
 builder.Services.AddControllers();
 
 // Swagger

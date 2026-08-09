@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Identity;
+using SportConnect.Core.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,5 +14,7 @@ namespace SportConnect.Infrastructure.Entities
         public string? SkillLevel { get; set; }
 
         public long? TelegramChatId { get; set; }
+
+        public ICollection<UserSportPreference> SportPreferences { get; set; } = new List<UserSportPreference>();
     }
 }

@@ -27,6 +27,7 @@ export default function MapPage() {
         boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
       }}>
         <span>{user?.userName}</span>
+        <button onClick={() => navigate('/profile')} style={{ marginLeft: 10, marginRight: 10 }}>Профиль</button>
         <button onClick={handleLogout} style={{ marginLeft: 10 }}>Выйти</button>
       </div>
 
