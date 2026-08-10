@@ -211,5 +211,90 @@ namespace SportConnect.Application.Services
 
             return await GetNearbyAsync(lat, lng, user.RadiusMeters, sportIds.Count > 0 ? sportIds : null);
         }
+
+        public async Task<MeetingDto> JoinAsync(Guid meetingId, Guid userId)
+        {
+            var meeting = await _context.Meetings
+                .IgnoreQueryFilters()
+                .Include(m => m.Participants)
+                .FirstOrDefaultAsync(m => m.Id == meetingId);
+
+            if (meeting == null)
+                throw new NotFoundException("Встреча не найдена");
+
+            if (meeting.Status == MeetingStatus.Cancelled
+                || meeting.Status == MeetingStatus.Completed
+                || meeting.Status == MeetingStatus.Started)
+                throw new ConflictException("Нельзя присоединиться к этой встрече");
+
+            var existingParticipant = meeting.Participants
+                .FirstOrDefault(p => p.UserId == userId && !p.IsDeleted);
+
+            if (existingParticipant != null)
+                throw new ConflictException("Вы уже участвуете");
+
+            var deletedParticipant = meeting.Participants
+                .FirstOrDefault(p => p.UserId == userId && p.IsDeleted);
+
+            if (deletedParticipant != null)
+            {
+                deletedParticipant.IsDeleted = false;
+                deletedParticipant.DeletedAt = null;
+                deletedParticipant.JoinedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                _context.MeetingParticipants.Add(new MeetingParticipant
+                {
+                    MeetingId = meetingId,
+                    UserId = userId,
+                    JoinedAt = DateTime.UtcNow
+                });
+            }
+
+            
+            await _context.SaveChangesAsync();
+
+            // Обновление статуса
+            var actualCount = await _context.MeetingParticipants
+                .Where(p => p.MeetingId == meetingId && !p.IsDeleted)
+                .CountAsync();
+
+            if (actualCount >= meeting.MaxParticipants)
+            {
+                meeting.Status = MeetingStatus.Full;
+                await _context.SaveChangesAsync();
+            }
+
+            return await GetByIdAsync(meetingId);
+        }
+
+        public async Task LeaveAsync(Guid meetingId, Guid userId)
+        {
+            var participant = await _context.MeetingParticipants
+                .FirstOrDefaultAsync(p => p.MeetingId == meetingId && p.UserId == userId);
+
+            if (participant == null)
+                throw new NotFoundException("Вы не участвуете в этой встрече");
+
+            if (participant.IsDeleted)
+                throw new ConflictException("Вы уже вышли из встречи");
+
+            var meeting = await _context.Meetings
+                .Include(m => m.Participants)
+                .FirstOrDefaultAsync(m => m.Id == meetingId);
+
+            if (meeting != null && meeting.AuthorId == userId)
+                throw new ConflictException("Автор не может покинуть свою встречу");
+
+            participant.IsDeleted = true;
+            participant.DeletedAt = DateTime.UtcNow;
+
+            //если Full — возврат в Recruiting
+            if (meeting != null && meeting.Status == MeetingStatus.Full)
+                meeting.Status = MeetingStatus.Recruiting;
+
+            await _context.SaveChangesAsync();
+        }
     }
 }

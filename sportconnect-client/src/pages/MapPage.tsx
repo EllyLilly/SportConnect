@@ -6,6 +6,7 @@ import SportFilter from '../components/SportFilter';
 import CreateMeetingModal from '../components/CreateMeetingModal';
 import api from '../api/axios';
 import { useToast } from '../contexts/ToastContext';
+import MeetingCard from '../components/MeetingCard';
 
 interface MeetingMarker {
   id: string;
@@ -20,6 +21,24 @@ interface MeetingMarker {
   status: number;
 }
 
+interface MeetingDetail {
+  id: string;
+  title: string;
+  sportName: string;
+  sportColor: string;
+  authorId: string;
+  authorName: string;
+  scheduledAt: string;
+  address: string | null;
+  description: string | null;
+  participantsCount: number;
+  maxParticipants: number;
+  status: number;
+  requiredSkillLevel: number;
+  inventory: string[] | null;
+  participants: Array<{ userId: string; userName: string; joinedAt: string }>;
+}
+
 export default function MapPage() {
   const { user, logout } = useAuth();
   const { showToast } = useToast();
@@ -29,6 +48,7 @@ export default function MapPage() {
   const [tempMarker, setTempMarker] = useState<[number, number] | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [meetings, setMeetings] = useState<MeetingMarker[]>([]);
+  const [selectedMeeting, setSelectedMeeting] = useState<MeetingDetail | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>([55.751574, 37.573856]);
   const mapRef = useRef<any>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -49,15 +69,15 @@ export default function MapPage() {
     setTempMarker(null);
   };
 
-const loadMeetings = useCallback(async (lat: number, lng: number) => {
-  try {
-    const res = await api.get(`/meetings/nearby?lat=${lat}&lng=${lng}`);
-    setMeetings(res.data);
-  } catch (error) {
-    console.error('Ошибка загрузки встреч:', error);
-    showToast('Не удалось загрузить встречи рядом. Попробуйте обновить карту.', 'error');
-  }
-}, [showToast]);
+  const loadMeetings = useCallback(async (lat: number, lng: number) => {
+    try {
+      const res = await api.get(`/meetings/nearby?lat=${lat}&lng=${lng}`);
+      setMeetings(res.data);
+    } catch (error) {
+      console.error('Ошибка загрузки встреч:', error);
+      showToast('Не удалось загрузить встречи рядом. Попробуйте обновить карту.', 'error');
+    }
+  }, [showToast]);
 
   const handleBoundsChange = useCallback((e: any) => {
     const center = e.get('newCenter');
@@ -90,6 +110,15 @@ const loadMeetings = useCallback(async (lat: number, lng: number) => {
       '#795548': 'islands#brownIcon',
     };
     return colorMap[color] || 'islands#blueIcon';
+  };
+
+  const loadMeetingDetail = async (id: string) => {
+    try {
+      const res = await api.get(`/meetings/${id}`);
+      setSelectedMeeting(res.data);
+    } catch (err: any) {
+      showToast('Не удалось загрузить встречу', 'error');
+    }
   };
 
   return (
@@ -127,21 +156,21 @@ const loadMeetings = useCallback(async (lat: number, lng: number) => {
             }}
           >
             {meetings.map((m) => (
-                <Placemark
-                  key={m.id}
-                  geometry={[m.latitude, m.longitude]}
-                  properties={{
-                    iconCaption: `${m.participantsCount}/${m.maxParticipants}`,
-                  }}
-                  options={{
-                    preset: getPresetByColor(m.sportColor),
-                  }}
-                  onClick={(e: any) => {
-                    e.stopPropagation();
-                    // здесь будет открытие карточки встречи
-                  }}
-                />
-              ))}
+              <Placemark
+                key={m.id}
+                geometry={[m.latitude, m.longitude]}
+                properties={{
+                  iconCaption: `${m.participantsCount}/${m.maxParticipants}`,
+                }}
+                options={{
+                  preset: getPresetByColor(m.sportColor),
+                }}
+                onClick={(e: any) => {
+                  e.stopPropagation();
+                  loadMeetingDetail(m.id);
+                }}
+              />
+            ))}
           </Clusterer>
 
           {tempMarker && (
@@ -164,6 +193,17 @@ const loadMeetings = useCallback(async (lat: number, lng: number) => {
           lng={tempMarker[1]}
           onClose={handleCloseModal}
           onCreated={handleMeetingCreated}
+        />
+      )}
+
+      {selectedMeeting && (
+        <MeetingCard
+          meeting={selectedMeeting}
+          onClose={() => setSelectedMeeting(null)}
+          onUpdate={() => {
+            loadMeetings(mapCenter[0], mapCenter[1]);
+            loadMeetingDetail(selectedMeeting.id);
+          }}
         />
       )}
     </div>

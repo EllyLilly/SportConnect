@@ -73,6 +73,7 @@ namespace SportConnect.API.Controllers
 
             return Ok(new AuthResponseDto
             {
+                Id = user.Id,
                 AccessToken = "",
                 UserName = user.UserName ?? "",
                 Email = user.Email ?? ""

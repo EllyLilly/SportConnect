@@ -74,5 +74,27 @@ namespace SportConnect.API.Controllers
                 _currentUserService.UserId.Value, lat, lng);
             return Ok(userMeetings);
         }
+
+        [HttpPost("{id:guid}/join")]
+        [Authorize]
+        public async Task<ActionResult<MeetingDto>> Join(Guid id)
+        {
+            if (_currentUserService.UserId == null)
+                return Unauthorized();
+
+            var meeting = await _meetingService.JoinAsync(id, _currentUserService.UserId.Value);
+            return Ok(meeting);
+        }
+
+        [HttpPost("{id:guid}/leave")]
+        [Authorize]
+        public async Task<ActionResult> Leave(Guid id)
+        {
+            if (_currentUserService.UserId == null)
+                return Unauthorized();
+
+            await _meetingService.LeaveAsync(id, _currentUserService.UserId.Value);
+            return NoContent();
+        }
     }
 }
