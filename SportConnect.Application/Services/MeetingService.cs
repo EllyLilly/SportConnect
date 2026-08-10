@@ -160,5 +160,56 @@ namespace SportConnect.Application.Services
                 CreatedAt = m.CreatedAt
             };
         }
+
+        public async Task<List<MeetingListItemDto>> GetNearbyAsync(double lat, double lng, int radiusMeters, List<Guid>? sportIds = null)
+        {
+            var point = new Point(lng, lat) { SRID = 4326 };
+
+            var query = _context.Meetings
+                .Where(m => !m.IsDeleted && !m.IsArchived)
+                .Where(m => m.Status == MeetingStatus.Recruiting || m.Status == MeetingStatus.Full)
+                .Where(m => m.Location.IsWithinDistance(point, radiusMeters))
+                .Include(m => m.Participants)
+                .Include(m => m.Sport)
+                .AsQueryable();
+
+            if (sportIds != null && sportIds.Count > 0)
+                query = query.Where(m => sportIds.Contains(m.SportId));
+
+            var meetings = await query
+                .OrderBy(m => m.ScheduledAt)
+                .Take(100)
+                .ToListAsync();
+
+            return meetings.Select(m => new MeetingListItemDto
+            {
+                Id = m.Id,
+                Title = m.Title,
+                Latitude = m.Location.Y,
+                Longitude = m.Location.X,
+                ScheduledAt = m.ScheduledAt,
+                Status = m.Status,
+                SportName = m.Sport.Name,
+                SportColor = m.Sport.Color ?? "#000000",
+                ParticipantsCount = m.Participants.Count,
+                MaxParticipants = m.MaxParticipants
+            }).ToList();
+        }
+
+        public async Task<List<MeetingListItemDto>> GetNearbyForUserAsync(Guid userId, double lat, double lng)
+        {
+            var user = await _context.Users
+                .Include(u => u.SportPreferences)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+                throw new NotFoundException("Пользователь не найден");
+
+            var sportIds = user.SportPreferences
+                .Select(sp => sp.SportId)
+                .ToList();
+
+            return await GetNearbyAsync(lat, lng, user.RadiusMeters, sportIds.Count > 0 ? sportIds : null);
+        }
     }
 }

@@ -57,5 +57,22 @@ namespace SportConnect.API.Controllers
             await _meetingService.CancelAsync(id, _currentUserService.UserId.Value);
             return NoContent();
         }
+
+        [HttpGet("nearby")]
+        public async Task<ActionResult<List<MeetingListItemDto>>> GetNearby(
+    [FromQuery] double lat,
+    [FromQuery] double lng)
+        {
+            if (_currentUserService.UserId == null)
+            {
+                // Публичный доступ — радиус по умолчанию, без фильтра интересов
+                var meetings = await _meetingService.GetNearbyAsync(lat, lng, 5000);
+                return Ok(meetings);
+            }
+
+            var userMeetings = await _meetingService.GetNearbyForUserAsync(
+                _currentUserService.UserId.Value, lat, lng);
+            return Ok(userMeetings);
+        }
     }
 }
