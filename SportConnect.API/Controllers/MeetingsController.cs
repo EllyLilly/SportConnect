@@ -32,7 +32,7 @@ namespace SportConnect.API.Controllers
         [HttpGet("{id:guid}")]
         public async Task<ActionResult<MeetingDto>> GetById(Guid id)
         {
-            var meeting = await _meetingService.GetByIdAsync(id);
+            var meeting = await _meetingService.GetByIdAsync(id, _currentUserService.UserId);
             return Ok(meeting);
         }
 

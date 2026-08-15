@@ -29,5 +29,9 @@ namespace SportConnect.Core.DTOs.Meetings
         public int ParticipantsCount { get; set; }
         public List<MeetingParticipantDto> Participants { get; set; } = new();
         public DateTime CreatedAt { get; set; }
+        public bool CanEdit { get; set; }
+        public bool CanJoin { get; set; }
+        public bool CanLeave { get; set; }
+        public int TimeUntilStartMinutes { get; set; }
     }
 }

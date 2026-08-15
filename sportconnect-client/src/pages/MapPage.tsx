@@ -37,6 +37,9 @@ interface MeetingDetail {
   requiredSkillLevel: number;
   inventory: string[] | null;
   participants: Array<{ userId: string; userName: string; joinedAt: string }>;
+  canEdit: boolean;
+  canJoin: boolean;
+  canLeave: boolean;
 }
 
 export default function MapPage() {

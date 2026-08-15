@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -26,6 +26,9 @@ interface MeetingCardProps {
     requiredSkillLevel: number;
     inventory: string[] | null;
     participants: Participant[];
+    canEdit: boolean;
+    canJoin: boolean;
+    canLeave: boolean;
   };
   onClose: () => void;
   onUpdate: () => void;
@@ -50,19 +53,9 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
   const { isAuthenticated } = useAuth();
   const { showToast } = useToast();
   const [joining, setJoining] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    api.get('/auth/me').then((res) => {
-      setCurrentUserId(res.data.id);
-    }).catch(() => {});
-  }, []);
-
-  const isAuthor = currentUserId === meeting.authorId;
-  const isParticipant = meeting.participants.some((p) => p.userId === currentUserId);
-  const isFull = meeting.participantsCount >= meeting.maxParticipants;
-  const canJoin = (meeting.status === 0 || meeting.status === 1) && !isParticipant && !isFull;
-  const canLeave = (meeting.status === 0 || meeting.status === 1) && isParticipant && !isAuthor;
+  const canJoin = meeting.canJoin;
+  const canLeave = meeting.canLeave;
 
   const formatTime = (utc: string) => {
     const date = new Date(utc);
@@ -80,14 +73,27 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
       return;
     }
 
+    if (joining) return;
+
     setJoining(true);
     try {
       await api.post(`/meetings/${meeting.id}/join`);
       showToast('Вы присоединились к встрече', 'success');
       onUpdate();
     } catch (err: any) {
+      const status = err.response?.status;
       const message = err.response?.data?.message || 'Ошибка';
-      showToast(message, 'error');
+
+      if (status === 409) {
+        showToast('К сожалению, место заняли', 'error');
+      } else if (status === 429) {
+        showToast('Слишком много запросов. Подождите немного', 'error');
+      } else {
+        showToast(message, 'error');
+      }
+      
+      // Обновление карточки
+      onUpdate();
     } finally {
       setJoining(false);
     }

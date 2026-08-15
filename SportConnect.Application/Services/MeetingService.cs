@@ -5,6 +5,7 @@ using SportConnect.Infrastructure.Entities;
 using SportConnect.Core.Entities;
 using NetTopologySuite.Geometries;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -64,10 +65,10 @@ namespace SportConnect.Application.Services
 
             await _context.SaveChangesAsync();
 
-            return await GetByIdAsync(meeting.Id);
+            return await GetByIdAsync(meeting.Id, authorId);
         }
 
-        public async Task<MeetingDto> GetByIdAsync(Guid meetingId)
+        public async Task<MeetingDto> GetByIdAsync(Guid meetingId, Guid? currentUserId = null)
         {
             var meeting = await _context.Meetings
                 .Include(m => m.Sport)
@@ -79,7 +80,22 @@ namespace SportConnect.Application.Services
             if (meeting == null)
                 throw new NotFoundException("Встреча не найдена");
 
-            return MapToDto(meeting);
+            var dto = MapToDto(meeting);
+
+            if (currentUserId.HasValue)
+            {
+                var isAuthor = meeting.AuthorId == currentUserId.Value;
+                var isParticipant = meeting.Participants.Any(p => p.UserId == currentUserId.Value && !p.IsDeleted);
+                var isFull = dto.ParticipantsCount >= meeting.MaxParticipants;
+                var canJoin = (meeting.Status == MeetingStatus.Recruiting || meeting.Status == MeetingStatus.Full)
+                              && !isParticipant && !isFull;
+
+                dto.CanEdit = isAuthor && meeting.Status != MeetingStatus.Completed && meeting.Status != MeetingStatus.Cancelled;
+                dto.CanJoin = canJoin;
+                dto.CanLeave = isParticipant && !isAuthor && meeting.Status != MeetingStatus.Completed && meeting.Status != MeetingStatus.Cancelled;
+            }
+
+            return dto;
         }
 
         public async Task<MeetingDto> UpdateAsync(Guid meetingId, Guid userId, UpdateMeetingDto dto)
@@ -109,7 +125,7 @@ namespace SportConnect.Application.Services
 
             await _context.SaveChangesAsync();
 
-            return await GetByIdAsync(meetingId);
+            return await GetByIdAsync(meetingId, userId);
         }
 
         public async Task CancelAsync(Guid meetingId, Guid userId)
@@ -131,6 +147,9 @@ namespace SportConnect.Application.Services
 
         private static MeetingDto MapToDto(Meeting m)
         {
+            var now = DateTime.UtcNow;
+            var participants = m.Participants.Where(p => !p.IsDeleted).ToList();
+
             return new MeetingDto
             {
                 Id = m.Id,
@@ -151,13 +170,14 @@ namespace SportConnect.Application.Services
                 AuthorId = m.AuthorId,
                 AuthorName = m.Author.UserName ?? "Неизвестный",
                 ParticipantsCount = m.Participants.Count,
-                Participants = m.Participants.Select(p => new MeetingParticipantDto
+                Participants = participants.Select(p => new MeetingParticipantDto
                 {
                     UserId = p.UserId,
                     UserName = p.User?.UserName ?? "Неизвестный",
                     JoinedAt = p.JoinedAt
                 }).ToList(),
-                CreatedAt = m.CreatedAt
+                CreatedAt = m.CreatedAt,
+                TimeUntilStartMinutes = (int)(m.ScheduledAt - now).TotalMinutes
             };
         }
 
@@ -214,85 +234,122 @@ namespace SportConnect.Application.Services
 
         public async Task<MeetingDto> JoinAsync(Guid meetingId, Guid userId)
         {
-            var meeting = await _context.Meetings
-                .IgnoreQueryFilters()
-                .Include(m => m.Participants)
-                .FirstOrDefaultAsync(m => m.Id == meetingId);
+            // Явная транзакция с блокировкой строки Meeting
+            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
 
-            if (meeting == null)
-                throw new NotFoundException("Встреча не найдена");
-
-            if (meeting.Status == MeetingStatus.Cancelled
-                || meeting.Status == MeetingStatus.Completed
-                || meeting.Status == MeetingStatus.Started)
-                throw new ConflictException("Нельзя присоединиться к этой встрече");
-
-            var existingParticipant = meeting.Participants
-                .FirstOrDefault(p => p.UserId == userId && !p.IsDeleted);
-
-            if (existingParticipant != null)
-                throw new ConflictException("Вы уже участвуете");
-
-            var deletedParticipant = meeting.Participants
-                .FirstOrDefault(p => p.UserId == userId && p.IsDeleted);
-
-            if (deletedParticipant != null)
+            try
             {
-                deletedParticipant.IsDeleted = false;
-                deletedParticipant.DeletedAt = null;
-                deletedParticipant.JoinedAt = DateTime.UtcNow;
-            }
-            else
-            {
-                _context.MeetingParticipants.Add(new MeetingParticipant
+                // Блокировка строки встречи. Другие транзакции ждут, пока эта не завершится
+                var meeting = await _context.Meetings
+                    .FromSqlInterpolated($"SELECT * FROM \"Meetings\" WHERE \"Id\" = {meetingId} FOR UPDATE")
+                    .IgnoreQueryFilters()
+                    .FirstOrDefaultAsync();
+
+                if (meeting == null)
                 {
-                    MeetingId = meetingId,
-                    UserId = userId,
-                    JoinedAt = DateTime.UtcNow
-                });
-            }
+                    await transaction.RollbackAsync();
+                    throw new NotFoundException("Встреча не найдена");
+                }
 
-            
-            await _context.SaveChangesAsync();
+                if (meeting.IsDeleted)
+                {
+                    await transaction.RollbackAsync();
+                    throw new NotFoundException("Встреча не найдена");
+                }
 
-            // Обновление статуса
-            var actualCount = await _context.MeetingParticipants
-                .Where(p => p.MeetingId == meetingId && !p.IsDeleted)
-                .CountAsync();
+                if (meeting.Status == MeetingStatus.Cancelled
+                    || meeting.Status == MeetingStatus.Completed
+                    || meeting.Status == MeetingStatus.Started)
+                {
+                    await transaction.RollbackAsync();
+                    throw new ConflictException("Нельзя присоединиться к этой встрече");
+                }
 
-            if (actualCount >= meeting.MaxParticipants)
-            {
-                meeting.Status = MeetingStatus.Full;
+                // Подсчет актуального кол-ва участников внутри транзакции
+                var actualCount = await _context.MeetingParticipants
+                    .Where(p => p.MeetingId == meetingId && !p.IsDeleted)
+                    .CountAsync();
+
+                if (actualCount >= meeting.MaxParticipants)
+                {
+                    await transaction.RollbackAsync();
+                    throw new ConflictException("Мест больше нет");
+                }
+
+                // Проверка участвует ли уже пользователь
+                var existingParticipant = await _context.MeetingParticipants
+                    .IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(p => p.MeetingId == meetingId && p.UserId == userId);
+
+                if (existingParticipant != null)
+                {
+                    if (!existingParticipant.IsDeleted)
+                    {
+                        await transaction.RollbackAsync();
+                        throw new ConflictException("Вы уже участвуете");
+                    }
+
+                    // Восстановление удаленной запись
+                    existingParticipant.IsDeleted = false;
+                    existingParticipant.DeletedAt = null;
+                    existingParticipant.JoinedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    _context.MeetingParticipants.Add(new MeetingParticipant
+                    {
+                        MeetingId = meetingId,
+                        UserId = userId,
+                        JoinedAt = DateTime.UtcNow
+                    });
+                }
+
+                // Если после добавления мест нет, то встреча Full
+                if (actualCount + 1 >= meeting.MaxParticipants)
+                {
+                    meeting.Status = MeetingStatus.Full;
+                }
+
+                meeting.UpdatedAt = DateTime.UtcNow;
+
                 await _context.SaveChangesAsync();
-            }
+                await transaction.CommitAsync();
 
-            return await GetByIdAsync(meetingId);
+                return await GetByIdAsync(meetingId, userId);
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         public async Task LeaveAsync(Guid meetingId, Guid userId)
         {
             var participant = await _context.MeetingParticipants
+                .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(p => p.MeetingId == meetingId && p.UserId == userId);
 
-            if (participant == null)
-                throw new NotFoundException("Вы не участвуете в этой встрече");
-
-            if (participant.IsDeleted)
-                throw new ConflictException("Вы уже вышли из встречи");
+            if (participant == null || participant.IsDeleted)
+                throw new NotFoundException("Вы не участник этой встречи");
 
             var meeting = await _context.Meetings
-                .Include(m => m.Participants)
                 .FirstOrDefaultAsync(m => m.Id == meetingId);
 
-            if (meeting != null && meeting.AuthorId == userId)
+            if (meeting == null)
+                throw new NotFoundException("Встреча не найдена");
+
+            if (meeting.AuthorId == userId)
                 throw new ConflictException("Автор не может покинуть свою встречу");
 
             participant.IsDeleted = true;
             participant.DeletedAt = DateTime.UtcNow;
 
-            //если Full — возврат в Recruiting
-            if (meeting != null && meeting.Status == MeetingStatus.Full)
+            // Если встреча Full - возвращаем в Recruiting
+            if (meeting.Status == MeetingStatus.Full)
                 meeting.Status = MeetingStatus.Recruiting;
+
+            meeting.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
         }
