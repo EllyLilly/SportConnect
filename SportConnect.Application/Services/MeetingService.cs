@@ -11,16 +11,19 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace SportConnect.Application.Services
 {
     public class MeetingService
     {
         private readonly SportConnectDbContext _context;
+        private readonly ILogger<MeetingService> _logger;
 
-        public MeetingService(SportConnectDbContext context)
+        public MeetingService(SportConnectDbContext context, ILogger<MeetingService> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         public async Task<MeetingDto> CreateAsync(Guid authorId, CreateMeetingDto dto)
@@ -101,21 +104,45 @@ namespace SportConnect.Application.Services
         public async Task<MeetingDto> UpdateAsync(Guid meetingId, Guid userId, UpdateMeetingDto dto)
         {
             var meeting = await _context.Meetings
+                .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(m => m.Id == meetingId);
 
-            if (meeting == null)
+            if (meeting == null || meeting.IsDeleted)
                 throw new NotFoundException("Встреча не найдена");
 
             if (meeting.AuthorId != userId)
                 throw new ConflictException("Только автор может редактировать встречу");
 
+            if (meeting.Status == MeetingStatus.Started
+                || meeting.Status == MeetingStatus.Completed
+                || meeting.Status == MeetingStatus.Cancelled)
+                throw new ConflictException("Нельзя редактировать встречу в текущем статусе");
+
+            var currentParticipants = await _context.MeetingParticipants
+                .Where(p => p.MeetingId == meetingId && !p.IsDeleted)
+                .CountAsync();
+
+            if (dto.MaxParticipants < currentParticipants)
+                throw new ConflictException($"Нельзя сократить участников ниже текущего количества ({currentParticipants})");
+
+            var scheduledAtUtc = dto.ScheduledAt.Kind == DateTimeKind.Utc
+                ? dto.ScheduledAt
+                : dto.ScheduledAt.ToUniversalTime();
+
+            // Валидация не в прошлом только если время реально меняется
+            var timeChanged = Math.Abs((scheduledAtUtc - meeting.ScheduledAt).TotalSeconds) > 1;
+
+            if (timeChanged && scheduledAtUtc < DateTime.UtcNow)
+                throw new ConflictException("Нельзя перенести встречу в прошлое");
+
             meeting.Title = dto.Title;
             meeting.Description = dto.Description;
             meeting.Address = dto.Address;
             meeting.Location = new Point(dto.Longitude, dto.Latitude) { SRID = 4326 };
-            meeting.ScheduledAt = dto.ScheduledAt.Kind == DateTimeKind.Utc
-                ? dto.ScheduledAt
-                : dto.ScheduledAt.ToUniversalTime();
+
+            // Если время не менялось, сохраняется оригинал
+            meeting.ScheduledAt = timeChanged ? scheduledAtUtc : meeting.ScheduledAt;
+
             meeting.MinParticipants = dto.MinParticipants;
             meeting.MaxParticipants = dto.MaxParticipants;
             meeting.RequiredSkillLevel = dto.RequiredSkillLevel;
@@ -131,18 +158,27 @@ namespace SportConnect.Application.Services
         public async Task CancelAsync(Guid meetingId, Guid userId)
         {
             var meeting = await _context.Meetings
+                .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(m => m.Id == meetingId);
 
-            if (meeting == null)
+            if (meeting == null || meeting.IsDeleted)
                 throw new NotFoundException("Встреча не найдена");
 
             if (meeting.AuthorId != userId)
                 throw new ConflictException("Только автор может отменить встречу");
 
+            if (meeting.Status == MeetingStatus.Completed
+                || meeting.Status == MeetingStatus.Cancelled)
+                throw new ConflictException("Нельзя отменить встречу в текущем статусе");
+
             meeting.Status = MeetingStatus.Cancelled;
+            meeting.IsArchived = true;
+            meeting.ArchivedAt = DateTime.UtcNow;
             meeting.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Meeting {MeetingId} cancelled by author {UserId}", meetingId, userId);
         }
 
         private static MeetingDto MapToDto(Meeting m)
@@ -195,6 +231,63 @@ namespace SportConnect.Application.Services
 
             if (sportIds != null && sportIds.Count > 0)
                 query = query.Where(m => sportIds.Contains(m.SportId));
+
+            var meetings = await query
+                .OrderBy(m => m.ScheduledAt)
+                .Take(100)
+                .ToListAsync();
+
+            return meetings.Select(m => new MeetingListItemDto
+            {
+                Id = m.Id,
+                Title = m.Title,
+                Latitude = m.Location.Y,
+                Longitude = m.Location.X,
+                ScheduledAt = m.ScheduledAt,
+                Status = m.Status,
+                SportName = m.Sport.Name,
+                SportColor = m.Sport.Color ?? "#000000",
+                ParticipantsCount = m.Participants.Count,
+                MaxParticipants = m.MaxParticipants
+            }).ToList();
+        }
+
+        public async Task<List<MeetingListItemDto>> GetNearbyByBoundsAsync(
+            double minLat, double maxLat, double minLng, double maxLng,
+            Guid? userId = null)
+        {
+            var envelope = new Polygon(
+                new LinearRing(new[]
+                {
+            new Coordinate(minLng, minLat),
+            new Coordinate(maxLng, minLat),
+            new Coordinate(maxLng, maxLat),
+            new Coordinate(minLng, maxLat),
+            new Coordinate(minLng, minLat),
+                })
+            )
+            { SRID = 4326 };
+
+            var query = _context.Meetings
+                .Where(m => !m.IsDeleted && !m.IsArchived)
+                .Where(m => m.Status == MeetingStatus.Recruiting || m.Status == MeetingStatus.Full)
+                .Where(m => m.Location.Intersects(envelope))
+                .Include(m => m.Participants)
+                .Include(m => m.Sport)
+                .AsQueryable();
+
+            if (userId.HasValue)
+            {
+                var user = await _context.Users
+                    .Include(u => u.SportPreferences)
+                    .FirstOrDefaultAsync(u => u.Id == userId.Value);
+
+                if (user != null && user.SportPreferences.Count > 0)
+                {
+                    var sportIds = user.SportPreferences.Select(sp => sp.SportId).ToList();
+                    query = query.Where(m => sportIds.Contains(m.SportId));
+                }
+            }
 
             var meetings = await query
                 .OrderBy(m => m.ScheduledAt)

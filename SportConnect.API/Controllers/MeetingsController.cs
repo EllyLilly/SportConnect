@@ -60,19 +60,14 @@ namespace SportConnect.API.Controllers
 
         [HttpGet("nearby")]
         public async Task<ActionResult<List<MeetingListItemDto>>> GetNearby(
-    [FromQuery] double lat,
-    [FromQuery] double lng)
+            [FromQuery] double minLat,
+            [FromQuery] double maxLat,
+            [FromQuery] double minLng,
+            [FromQuery] double maxLng)
         {
-            if (_currentUserService.UserId == null)
-            {
-                // Публичный доступ — радиус по умолчанию, без фильтра интересов
-                var meetings = await _meetingService.GetNearbyAsync(lat, lng, 5000);
-                return Ok(meetings);
-            }
-
-            var userMeetings = await _meetingService.GetNearbyForUserAsync(
-                _currentUserService.UserId.Value, lat, lng);
-            return Ok(userMeetings);
+            var meetings = await _meetingService.GetNearbyByBoundsAsync(
+                minLat, maxLat, minLng, maxLng, _currentUserService.UserId);
+            return Ok(meetings);
         }
 
         [HttpPost("{id:guid}/join")]

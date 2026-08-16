@@ -52,7 +52,7 @@ export default function MapPage() {
   const [showModal, setShowModal] = useState(false);
   const [meetings, setMeetings] = useState<MeetingMarker[]>([]);
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingDetail | null>(null);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([55.751574, 37.573856]);
+  const [mapCenter] = useState<[number, number]>([55.751574, 37.573856]);
   const mapRef = useRef<any>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -72,33 +72,37 @@ export default function MapPage() {
     setTempMarker(null);
   };
 
-  const loadMeetings = useCallback(async (lat: number, lng: number) => {
-    try {
-      const res = await api.get(`/meetings/nearby?lat=${lat}&lng=${lng}`);
-      setMeetings(res.data);
-    } catch (error) {
-      console.error('Ошибка загрузки встреч:', error);
-      showToast('Не удалось загрузить встречи рядом. Попробуйте обновить карту.', 'error');
-    }
+  const loadMeetings = useCallback(async (minLat: number, maxLat: number, minLng: number, maxLng: number) => {
+  try {
+    const res = await api.get(`/meetings/nearby?minLat=${minLat}&maxLat=${maxLat}&minLng=${minLng}&maxLng=${maxLng}`);
+    setMeetings(res.data);
+  } catch (error) {
+    console.error('Ошибка загрузки встреч:', error);
+    showToast('Не удалось загрузить встречи рядом', 'error');
+  }
   }, [showToast]);
 
   const handleBoundsChange = useCallback((e: any) => {
-    const center = e.get('newCenter');
-    const newCenter: [number, number] = [center[0], center[1]];
-    setMapCenter(newCenter);
+  const bounds = e.get('newBounds');
+  if (!bounds) return;
 
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      loadMeetings(newCenter[0], newCenter[1]);
-    }, 500);
+  const minLat = bounds[0][0];
+  const maxLat = bounds[1][0];
+  const minLng = bounds[0][1];
+  const maxLng = bounds[1][1];
+
+  if (debounceRef.current) clearTimeout(debounceRef.current);
+  debounceRef.current = setTimeout(() => {
+    loadMeetings(minLat, maxLat, minLng, maxLng);
+  }, 500);
   }, [loadMeetings]);
 
   useEffect(() => {
-    loadMeetings(mapCenter[0], mapCenter[1]);
+  loadMeetings(55.6, 55.8, 37.3, 37.7);
   }, []);
 
-  const handleMeetingCreated = () => {
-    loadMeetings(mapCenter[0], mapCenter[1]);
+ const handleMeetingCreated = (lat: number, lng: number) => {
+  loadMeetings(lat - 0.01, lat + 0.01, lng - 0.01, lng + 0.01);
   };
 
   const getPresetByColor = (color: string) => {
@@ -123,6 +127,9 @@ export default function MapPage() {
       showToast('Не удалось загрузить встречу', 'error');
     }
   };
+
+  console.log('YANDEX API KEY:', import.meta.env.VITE_YANDEX_API_KEY);
+  console.log('GEOCODER API KEY:', import.meta.env.VITE_YANDEX_GEOCODER_API_KEY);
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
@@ -204,9 +211,9 @@ export default function MapPage() {
           meeting={selectedMeeting}
           onClose={() => setSelectedMeeting(null)}
           onUpdate={() => {
-            loadMeetings(mapCenter[0], mapCenter[1]);
-            loadMeetingDetail(selectedMeeting.id);
-          }}
+          loadMeetings(mapCenter[0] - 0.01, mapCenter[0] + 0.01, mapCenter[1] - 0.01, mapCenter[1] + 0.01);
+          loadMeetingDetail(selectedMeeting.id);
+        }}
         />
       )}
     </div>

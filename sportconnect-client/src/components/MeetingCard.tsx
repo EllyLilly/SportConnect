@@ -2,6 +2,7 @@ import { useState } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import EditMeetingModal from './EditMeetingModal';
 
 interface Participant {
   userId: string;
@@ -53,7 +54,9 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
   const { isAuthenticated } = useAuth();
   const { showToast } = useToast();
   const [joining, setJoining] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
+  const canEdit = meeting.canEdit;
   const canJoin = meeting.canJoin;
   const canLeave = meeting.canLeave;
 
@@ -110,6 +113,22 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
     }
   };
 
+  const handleCancel = async () => {
+  if (!window.confirm('Отменить встречу? Это действие нельзя отменить.')) {
+    return;
+  }
+
+  try {
+    await api.post(`/meetings/${meeting.id}/cancel`);
+    showToast('Встреча отменена', 'success');
+    onUpdate();
+    onClose();
+  } catch (err: any) {
+    const message = err.response?.data?.message || 'Ошибка';
+    showToast(message, 'error');
+  }
+};
+
   const progress = meeting.maxParticipants > 0
     ? (meeting.participantsCount / meeting.maxParticipants) * 100
     : 0;
@@ -123,6 +142,33 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
       padding: 20, overflowY: 'auto',
     }}>
       <button onClick={onClose} style={{ float: 'right' }}>✕</button>
+
+      {canEdit && (
+          <button
+            onClick={() => setShowEditModal(true)}
+            style={{ float: 'right', marginRight: 8 }}
+          >
+            Редактировать
+          </button>
+      )}
+
+      {canEdit && (
+        <button
+          onClick={handleCancel}
+          style={{
+            float: 'right',
+            marginRight: 8,
+            background: '#f44336',
+            color: 'white',
+            border: 'none',
+            padding: '6px 12px',
+            borderRadius: 4,
+            cursor: 'pointer',
+          }}
+        >
+          Отменить
+        </button>
+      )}
 
       <span style={{
         background: meeting.sportColor,
@@ -178,6 +224,14 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
         <button onClick={handleLeave} style={{ marginTop: 16 }}>
           Выйти (-)
         </button>
+      )}
+
+      {showEditModal && (
+        <EditMeetingModal
+          meetingId={meeting.id}
+          onClose={() => setShowEditModal(false)}
+          onUpdated={onUpdate}
+        />
       )}
     </div>
   );

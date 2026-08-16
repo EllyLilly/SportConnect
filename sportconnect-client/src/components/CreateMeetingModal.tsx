@@ -11,7 +11,7 @@ interface CreateMeetingModalProps {
   lat: number;
   lng: number;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (lat: number, lng: number) => void;
 }
 
 export default function CreateMeetingModal({ lat, lng, onClose, onCreated }: CreateMeetingModalProps) {
@@ -33,7 +33,7 @@ export default function CreateMeetingModal({ lat, lng, onClose, onCreated }: Cre
     });
 
     // Геокодирование — получение адреса по координатам
-    const apiKey = import.meta.env.VITE_YANDEX_API_KEY;
+    const apiKey = import.meta.env.VITE_YANDEX_GEOCODER_API_KEY;
     fetch(`https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}&format=json&geocode=${lng},${lat}&lang=ru_RU`)
       .then((res) => res.json())
       .then((data) => {
@@ -67,7 +67,7 @@ export default function CreateMeetingModal({ lat, lng, onClose, onCreated }: Cre
       });
 
       showToast('Встреча создана', 'success');
-      onCreated();
+      onCreated(lat, lng);
       onClose();
     } catch (err: any) {
       const message = err.response?.data?.message || err.response?.data?.title || 'Ошибка создания встречи';
