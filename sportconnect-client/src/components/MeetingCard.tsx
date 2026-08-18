@@ -3,6 +3,7 @@ import api from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import EditMeetingModal from './EditMeetingModal';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface Participant {
   userId: string;
@@ -85,17 +86,14 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
       onUpdate();
     } catch (err: any) {
       const status = err.response?.status;
-      const message = err.response?.data?.message || 'Ошибка';
+      const message = getErrorMessage(err, 'Ошибка');
 
       if (status === 409) {
-        showToast('К сожалению, место заняли', 'error');
-      } else if (status === 429) {
-        showToast('Слишком много запросов. Подождите немного', 'error');
+        showToast('К сожалению, место только что заняли', 'error');
       } else {
         showToast(message, 'error');
       }
       
-      // Обновление карточки
       onUpdate();
     } finally {
       setJoining(false);

@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using SportConnect.Application.Services;
 using SportConnect.Core.DTOs.Meetings;
 
@@ -20,6 +21,7 @@ namespace SportConnect.API.Controllers
 
         [HttpPost]
         [Authorize]
+        [EnableRateLimiting("CreateMeeting")]
         public async Task<ActionResult<MeetingDto>> Create([FromBody] CreateMeetingDto dto)
         {
             if (_currentUserService.UserId == null)
@@ -72,6 +74,7 @@ namespace SportConnect.API.Controllers
 
         [HttpPost("{id:guid}/join")]
         [Authorize]
+        [EnableRateLimiting("JoinMeeting")]
         public async Task<ActionResult<MeetingDto>> Join(Guid id)
         {
             if (_currentUserService.UserId == null)
@@ -83,6 +86,7 @@ namespace SportConnect.API.Controllers
 
         [HttpPost("{id:guid}/leave")]
         [Authorize]
+        [EnableRateLimiting("JoinMeeting")]
         public async Task<ActionResult> Leave(Guid id)
         {
             if (_currentUserService.UserId == null)

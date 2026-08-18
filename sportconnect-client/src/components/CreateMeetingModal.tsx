@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import api from '../api/axios';
 import { useToast } from '../contexts/ToastContext';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface Sport {
   id: string;
@@ -70,9 +71,8 @@ export default function CreateMeetingModal({ lat, lng, onClose, onCreated }: Cre
       onCreated(lat, lng);
       onClose();
     } catch (err: any) {
-      const message = err.response?.data?.message || err.response?.data?.title || 'Ошибка создания встречи';
-      showToast(message, 'error');
-    }
+      showToast(getErrorMessage(err, 'Ошибка создания встречи'), 'error');
+  }
   };
 
   return (

@@ -99,7 +99,7 @@ namespace SportConnect.Application.Services
         }
 
         /// <summary>
-        /// Удаляет старые отменённые встречи, которые висели в архиве больше 7 дней.
+        /// Удаление старых отмененных встречи, которые висели в архиве больше 7 дней
         /// </summary>
         public async Task PurgeOldCancelledMeetingsAsync(CancellationToken cancellationToken)
         {

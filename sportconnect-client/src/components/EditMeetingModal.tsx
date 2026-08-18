@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useToast } from '../contexts/ToastContext';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface Sport {
   id: string;
@@ -103,9 +104,8 @@ export default function EditMeetingModal({ meetingId, onClose, onUpdated }: Edit
       onUpdated();
       onClose();
     } catch (err: any) {
-      const message = err.response?.data?.message || 'Ошибка при сохранении';
-      showToast(message, 'error');
-    } finally {
+        showToast(getErrorMessage(err, 'Ошибка при сохранении'), 'error');
+        } finally {
       setSaving(false);
     }
   };
