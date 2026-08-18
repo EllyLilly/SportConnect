@@ -10,7 +10,7 @@ namespace SportConnect.Core.DTOs.Profile
     public class UpdateProfileDto
     {
         public int RadiusMeters { get; set; }
-        public string? SkillLevel { get; set; }
+        public SkillLevel SkillLevel { get; set; }
         public List<Guid> SportIds { get; set; } = new();
     }
 }

@@ -205,6 +205,7 @@ namespace SportConnect.Application.Services
                 SportColor = m.Sport.Color ?? "#000000",
                 AuthorId = m.AuthorId,
                 AuthorName = m.Author.UserName ?? "Неизвестный",
+                AuthorSkillLevel = m.Author.SkillLevel,
                 ParticipantsCount = m.Participants.Count,
                 Participants = participants.Select(p => new MeetingParticipantDto
                 {

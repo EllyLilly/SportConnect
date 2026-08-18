@@ -12,7 +12,7 @@ namespace SportConnect.Core.DTOs.Profile
         public string Email { get; set; } = string.Empty;
         public string? UserName { get; set; }
         public int RadiusMeters { get; set; }
-        public string? SkillLevel { get; set; }
+        public SkillLevel SkillLevel { get; set; }
         public List<Guid> SportIds { get; set; } = new();
     }
 }

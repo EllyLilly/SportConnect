@@ -10,15 +10,15 @@ interface Sport {
 }
 
 const skillLevels = [
-  { value: 'Any', label: 'Любой' },
-  { value: 'Beginner', label: 'Новичок' },
-  { value: 'Amateur', label: 'Любитель' },
-  { value: 'Advanced', label: 'Продвинутый' },
+  { value: 0, label: 'Любой' },
+  { value: 1, label: 'Новичок' },
+  { value: 2, label: 'Любитель' },
+  { value: 3, label: 'Продвинутый' },
 ];
 
 export default function ProfilePage() {
   const [radius, setRadius] = useState(3000);
-  const [skillLevel, setSkillLevel] = useState('Any');
+  const [skillLevel, setSkillLevel] = useState(0);
   const [selectedSportIds, setSelectedSportIds] = useState<string[]>([]);
   const [sports, setSports] = useState<Sport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,7 +93,7 @@ export default function ProfilePage() {
           <label>Уровень подготовки</label>
           <select
             value={skillLevel}
-            onChange={(e) => setSkillLevel(e.target.value)}
+            onChange={(e) => setSkillLevel(Number(e.target.value))}
             style={{ width: '100%', padding: '8px', marginTop: 4 }}
           >
             {skillLevels.map((lvl) => (

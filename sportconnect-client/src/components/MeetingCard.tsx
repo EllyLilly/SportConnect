@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import EditMeetingModal from './EditMeetingModal';
 import { getErrorMessage } from '../utils/errorMessage';
+import { formatRelativeTime } from '../utils/formatRelativeTime';
 
 interface Participant {
   userId: string;
@@ -18,6 +19,7 @@ interface MeetingCardProps {
     sportName: string;
     sportColor: string;
     authorName: string;
+    authorSkillLevel: number;
     authorId: string;
     scheduledAt: string;
     address: string | null;
@@ -61,15 +63,7 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
   const canJoin = meeting.canJoin;
   const canLeave = meeting.canLeave;
 
-  const formatTime = (utc: string) => {
-    const date = new Date(utc);
-    return date.toLocaleString('ru-RU', {
-      day: 'numeric',
-      month: 'long',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  
 
   const handleJoin = async () => {
     if (!isAuthenticated) {
@@ -181,10 +175,11 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
       <h2 style={{ marginTop: 12 }}>{meeting.title}</h2>
 
       <p><strong>Автор:</strong> {meeting.authorName}</p>
-      <p><strong>Время:</strong> {formatTime(meeting.scheduledAt)}</p>
+      <p><strong>Время:</strong> {formatRelativeTime(meeting.scheduledAt)}</p>
       {meeting.address && <p><strong>Место:</strong> {meeting.address}</p>}
       {meeting.description && <p><strong>Описание:</strong> {meeting.description}</p>}
       <p><strong>Уровень:</strong> {skillLabels[meeting.requiredSkillLevel]}</p>
+      <p><strong>Уровень автора:</strong> {skillLabels[meeting.authorSkillLevel]}</p>
 
       {meeting.inventory && meeting.inventory.length > 0 && (
         <p><strong>Инвентарь:</strong> {meeting.inventory.join(', ')}</p>

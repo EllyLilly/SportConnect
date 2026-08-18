@@ -24,7 +24,7 @@ namespace SportConnect.API.Middleware
             {
                 Log.Error(ex, "Application error: {Message}", ex.Message);
                 context.Response.StatusCode = ex.StatusCode;
-                context.Response.ContentType = "application/json";
+                context.Response.ContentType = "application/json; charset=utf-8";
                 var errorResponse = new { message = ex.Message, statusCode = ex.StatusCode };
                 var json = JsonSerializer.Serialize(errorResponse);
                 await context.Response.WriteAsync(json);
@@ -33,7 +33,7 @@ namespace SportConnect.API.Middleware
             {
                 Log.Fatal(ex, "Unhandled exception");
                 context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-                context.Response.ContentType = "application/json";
+                context.Response.ContentType = "application/json; charset=utf-8";
                 var errorResponse = new { message = "Внутренняя ошибка сервера", statusCode = 500 };
                 var json = JsonSerializer.Serialize(errorResponse);
                 await context.Response.WriteAsync(json);

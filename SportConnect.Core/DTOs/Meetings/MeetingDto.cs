@@ -20,6 +20,7 @@ namespace SportConnect.Core.DTOs.Meetings
         public int MaxParticipants { get; set; }
         public MeetingStatus Status { get; set; }
         public SkillLevel RequiredSkillLevel { get; set; }
+        public SkillLevel AuthorSkillLevel { get; set; }
         public string[]? Inventory { get; set; }
         public Guid SportId { get; set; }
         public string SportName { get; set; } = string.Empty;
