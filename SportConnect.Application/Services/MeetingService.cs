@@ -328,49 +328,33 @@ namespace SportConnect.Application.Services
 
         public async Task<MeetingDto> JoinAsync(Guid meetingId, Guid userId)
         {
-            // Явная транзакция с блокировкой строки Meeting
             await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
 
             try
             {
-                // Блокировка строки встречи. Другие транзакции ждут, пока эта не завершится
                 var meeting = await _context.Meetings
                     .FromSqlInterpolated($"SELECT * FROM \"Meetings\" WHERE \"Id\" = {meetingId} FOR UPDATE")
                     .IgnoreQueryFilters()
                     .FirstOrDefaultAsync();
 
                 if (meeting == null)
-                {
-                    await transaction.RollbackAsync();
                     throw new NotFoundException("Встреча не найдена");
-                }
 
                 if (meeting.IsDeleted)
-                {
-                    await transaction.RollbackAsync();
                     throw new NotFoundException("Встреча не найдена");
-                }
 
                 if (meeting.Status == MeetingStatus.Cancelled
                     || meeting.Status == MeetingStatus.Completed
                     || meeting.Status == MeetingStatus.Started)
-                {
-                    await transaction.RollbackAsync();
                     throw new ConflictException("Нельзя присоединиться к этой встрече");
-                }
 
-                // Подсчет актуального кол-ва участников внутри транзакции
                 var actualCount = await _context.MeetingParticipants
                     .Where(p => p.MeetingId == meetingId && !p.IsDeleted)
                     .CountAsync();
 
                 if (actualCount >= meeting.MaxParticipants)
-                {
-                    await transaction.RollbackAsync();
                     throw new ConflictException("Мест больше нет");
-                }
 
-                // Проверка участвует ли уже пользователь
                 var existingParticipant = await _context.MeetingParticipants
                     .IgnoreQueryFilters()
                     .FirstOrDefaultAsync(p => p.MeetingId == meetingId && p.UserId == userId);
@@ -378,12 +362,8 @@ namespace SportConnect.Application.Services
                 if (existingParticipant != null)
                 {
                     if (!existingParticipant.IsDeleted)
-                    {
-                        await transaction.RollbackAsync();
                         throw new ConflictException("Вы уже участвуете");
-                    }
 
-                    // Восстановление удаленной запись
                     existingParticipant.IsDeleted = false;
                     existingParticipant.DeletedAt = null;
                     existingParticipant.JoinedAt = DateTime.UtcNow;
@@ -398,11 +378,8 @@ namespace SportConnect.Application.Services
                     });
                 }
 
-                // Если после добавления мест нет, то встреча Full
                 if (actualCount + 1 >= meeting.MaxParticipants)
-                {
                     meeting.Status = MeetingStatus.Full;
-                }
 
                 meeting.UpdatedAt = DateTime.UtcNow;
 
@@ -411,9 +388,16 @@ namespace SportConnect.Application.Services
 
                 return await GetByIdAsync(meetingId, userId);
             }
-            catch
+            catch (Exception ex)
             {
-                await transaction.RollbackAsync();
+                try
+                {
+                    await transaction.RollbackAsync();
+                }
+                catch
+                {
+                    //транзакция уже завершена, игнор
+                }
                 throw;
             }
         }
@@ -439,7 +423,7 @@ namespace SportConnect.Application.Services
             participant.IsDeleted = true;
             participant.DeletedAt = DateTime.UtcNow;
 
-            // Если встреча Full - возвращаем в Recruiting
+            //если встреча Full - возврат в Recruiting
             if (meeting.Status == MeetingStatus.Full)
                 meeting.Status = MeetingStatus.Recruiting;
 

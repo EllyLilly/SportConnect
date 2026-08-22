@@ -17,6 +17,7 @@ const skillLevels = [
 ];
 
 export default function ProfilePage() {
+  const [city, setCity] = useState('');
   const [radius, setRadius] = useState(3000);
   const [skillLevel, setSkillLevel] = useState(0);
   const [selectedSportIds, setSelectedSportIds] = useState<string[]>([]);
@@ -33,6 +34,7 @@ export default function ProfilePage() {
           api.get('/sport'),
         ]);
 
+        setCity(profileRes.data.city || '');
         setRadius(profileRes.data.radiusMeters);
         setSkillLevel(profileRes.data.skillLevel);
         setSelectedSportIds(profileRes.data.sportIds);
@@ -58,11 +60,13 @@ export default function ProfilePage() {
 
     try {
       await api.put('/profile', {
-        radiusMeters: radius,
-        skillLevel,
-        sportIds: selectedSportIds,
-      });
-      showToast('Профиль сохранён', 'success');
+      radiusMeters: radius,
+      skillLevel,
+      sportIds: selectedSportIds,
+      city: city || null,
+    });
+    localStorage.removeItem('mapCenter');
+    showToast('Профиль сохранён', 'success');
     } catch (err: any) {
       const message = err.response?.data?.message || 'Ошибка сохранения';
       showToast(message, 'error');
@@ -76,6 +80,16 @@ export default function ProfilePage() {
       <h1>Профиль</h1>
 
       <form onSubmit={handleSubmit}>
+        <div style={{ marginBottom: 20 }}>
+          <label>Город</label>
+          <input
+            type="text"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="Например: Санкт-Петербург"
+            style={{ width: '100%', padding: '8px', marginTop: 4 }}
+          />
+        </div>
         <div style={{ marginBottom: 20 }}>
           <label>Радиус поиска: {(radius / 1000).toFixed(1)} км</label>
           <input

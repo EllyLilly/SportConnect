@@ -9,6 +9,7 @@ namespace SportConnect.Core.DTOs.Profile
 {
     public class UpdateProfileDto
     {
+        public string? City { get; set; }
         public int RadiusMeters { get; set; }
         public SkillLevel SkillLevel { get; set; }
         public List<Guid> SportIds { get; set; } = new();

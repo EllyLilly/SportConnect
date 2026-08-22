@@ -17,9 +17,9 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/map" element={<ProtectedRoute><MapPage /></ProtectedRoute>} />
+          <Route path="/map" element={<MapPage />} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-          <Route path="/" element={<LoginPage />} />
+          <Route path="/" element={<MapPage />} />
         </Routes>
         </ToastProvider>
         </ErrorBoundary>

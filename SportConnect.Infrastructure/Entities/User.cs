@@ -10,6 +10,7 @@ namespace SportConnect.Infrastructure.Entities
 {
     public class User : IdentityUser<Guid>
     {
+        public string? City { get; set; }
         public int RadiusMeters { get; set; } = 3000;
         public SkillLevel SkillLevel { get; set; } = SkillLevel.Any;
 

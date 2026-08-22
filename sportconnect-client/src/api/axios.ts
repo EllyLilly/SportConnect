@@ -35,7 +35,7 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch {
         localStorage.removeItem('accessToken');
-        window.location.href = '/login';
+        // Нет редиректа для гостя, чтобы он просматривал карту без входа
         return Promise.reject(error);
       }
     }

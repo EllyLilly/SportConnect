@@ -7,6 +7,7 @@ import CreateMeetingModal from '../components/CreateMeetingModal';
 import api from '../api/axios';
 import { useToast } from '../contexts/ToastContext';
 import MeetingCard from '../components/MeetingCard';
+import { useLocation } from 'react-router-dom';
 
 interface MeetingMarker {
   id: string;
@@ -28,6 +29,7 @@ interface MeetingDetail {
   sportColor: string;
   authorId: string;
   authorName: string;
+  authorSkillLevel: number;
   scheduledAt: string;
   address: string | null;
   description: string | null;
@@ -46,19 +48,25 @@ export default function MapPage() {
   const { user, logout } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [selectedSports, setSelectedSports] = useState<string[]>([]);
 
   const [tempMarker, setTempMarker] = useState<[number, number] | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [meetings, setMeetings] = useState<MeetingMarker[]>([]);
+  const [loadingMeetings, setLoadingMeetings] = useState(true);
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingDetail | null>(null);
-  const [mapCenter] = useState<[number, number]>([55.751574, 37.573856]);
+  const [showEmptyState, setShowEmptyState] = useState(false);
+  const emptyStateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([55.751574, 37.573856]);
   const mapRef = useRef<any>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingCenterRef = useRef<[number, number] | null>(null);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+  logout();
+  navigate('/');
   };
 
   const handleMapClick = useCallback((e: any) => {
@@ -73,18 +81,27 @@ export default function MapPage() {
   };
 
   const loadMeetings = useCallback(async (minLat: number, maxLat: number, minLng: number, maxLng: number) => {
+  setLoadingMeetings(true);
   try {
     const res = await api.get(`/meetings/nearby?minLat=${minLat}&maxLat=${maxLat}&minLng=${minLng}&maxLng=${maxLng}`);
     setMeetings(res.data);
   } catch (error) {
     console.error('Ошибка загрузки встреч:', error);
     showToast('Не удалось загрузить встречи рядом', 'error');
+  } finally {
+    setLoadingMeetings(false);
   }
-  }, [showToast]);
+}, [showToast]);
 
   const handleBoundsChange = useCallback((e: any) => {
   const bounds = e.get('newBounds');
   if (!bounds) return;
+
+  const center = e.get('newCenter');
+  if (center) {
+    setMapCenter([center[0], center[1]]);
+    localStorage.setItem('mapCenter', JSON.stringify([center[0], center[1]]));
+  }
 
   const minLat = bounds[0][0];
   const maxLat = bounds[1][0];
@@ -97,9 +114,171 @@ export default function MapPage() {
   }, 500);
   }, [loadMeetings]);
 
+  const [citySearch, setCitySearch] = useState(() => {
+  const saved = localStorage.getItem('lastCity');
+  return saved || '';
+  });
+  const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
+
+  const handleCitySearch = async (value: string) => {
+    setCitySearch(value);
+    setSelectedSuggestionIndex(-1);
+    if (value.length < 2) {
+      setCitySuggestions([]);
+      return;
+    }
+
+    try {
+      const apiKey = import.meta.env.VITE_YANDEX_GEOCODER_API_KEY;
+      const res = await fetch(
+        `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}&format=json&geocode=${encodeURIComponent(value)}&lang=ru_RU&kind=locality`
+      );
+      const data = await res.json();
+      const items = data?.response?.GeoObjectCollection?.featureMember
+        ?.map((item: any) => item.GeoObject.name)
+        .filter((name: string, index: number, arr: string[]) => arr.indexOf(name) === index)
+        .slice(0, 10);
+      setCitySuggestions(items || []);
+    } catch {
+      setCitySuggestions([]);
+    }
+  };
+
+  const handleCitySelect = async (cityName: string) => {
+    setCitySearch(cityName);
+    setCitySuggestions([]);
+    localStorage.setItem('lastCity', cityName);
+
+    try {
+      const apiKey = import.meta.env.VITE_YANDEX_GEOCODER_API_KEY;
+      const res = await fetch(
+        `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}&format=json&geocode=${encodeURIComponent(cityName)}&lang=ru_RU`
+      );
+      const data = await res.json();
+      const pos = data?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject?.Point?.pos;
+      if (pos) {
+        const [lng, lat] = pos.split(' ').map(Number);
+        setMapCenter([lat, lng]);
+        localStorage.setItem('mapCenter', JSON.stringify([lat, lng]));
+        pendingCenterRef.current = [lat, lng];
+
+        if (mapRef.current) {
+        mapRef.current.setCenter([lat, lng], 12);
+        pendingCenterRef.current = null;
+        }
+
+        loadMeetings(lat - 0.01, lat + 0.01, lng - 0.01, lng + 0.01);
+      }
+    } catch {
+      showToast('Не удалось найти город', 'error');
+    }
+  };
+
+    const handleCityKeyDown = (e: React.KeyboardEvent) => {
+      if (citySuggestions.length === 0) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedSuggestionIndex((prev) =>
+          prev < citySuggestions.length - 1 ? prev + 1 : 0
+        );
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedSuggestionIndex((prev) =>
+          prev > 0 ? prev - 1 : citySuggestions.length - 1
+        );
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (selectedSuggestionIndex >= 0) {
+          handleCitySelect(citySuggestions[selectedSuggestionIndex]);
+        } else if (citySearch.trim()) {
+          handleCitySelect(citySearch.trim());
+        }
+      } else if (e.key === 'Escape') {
+        setCitySuggestions([]);
+        setSelectedSuggestionIndex(-1);
+      }
+    };
+
   useEffect(() => {
-  loadMeetings(55.6, 55.8, 37.3, 37.7);
-  }, []);
+  const loadUserCity = async () => {
+    try {
+      //город с главной стр
+      const manualCity = localStorage.getItem('manualCity');
+      if (manualCity) {
+        localStorage.removeItem('manualCity');
+        const apiKey = import.meta.env.VITE_YANDEX_GEOCODER_API_KEY;
+        const geocodeRes = await fetch(
+          `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}&format=json&geocode=${encodeURIComponent(manualCity)}&lang=ru_RU`
+        );
+        const geocodeData = await geocodeRes.json();
+        const pos = geocodeData?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject?.Point?.pos;
+        if (pos) {
+          const [lng, lat] = pos.split(' ').map(Number);
+          setMapCenter([lat, lng]);
+          pendingCenterRef.current = [lat, lng];
+          loadMeetings(lat - 0.01, lat + 0.01, lng - 0.01, lng + 0.01);
+          return;
+        }
+      }
+      
+      // Если есть localStorage, то он используется, при условии что он актуальнее
+      const saved = localStorage.getItem('mapCenter');
+      if (saved) {
+        const [lat, lng] = JSON.parse(saved);
+        setMapCenter([lat, lng]);
+        pendingCenterRef.current = [lat, lng];
+        if (mapRef.current) {
+          mapRef.current.setCenter([lat, lng], 12);
+          pendingCenterRef.current = null;
+        }
+        loadMeetings(lat - 0.01, lat + 0.01, lng - 0.01, lng + 0.01);
+        return;
+      }
+
+      //город из профиля
+      const profileRes = await api.get('/profile');
+      const city = profileRes.data.city;
+      if (city) {
+        const apiKey = import.meta.env.VITE_YANDEX_GEOCODER_API_KEY;
+        const geocodeRes = await fetch(
+          `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}&format=json&geocode=${encodeURIComponent(city)}&lang=ru_RU`
+        );
+        const geocodeData = await geocodeRes.json();
+        const pos = geocodeData?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject?.Point?.pos;
+        if (pos) {
+            const [lng, lat] = pos.split(' ').map(Number);
+            setMapCenter([lat, lng]);
+            loadMeetings(lat - 0.01, lat + 0.01, lng - 0.01, lng + 0.01);
+            return;
+          }
+      }
+
+      loadMeetings(55.6, 55.8, 37.3, 37.7);
+    } catch (error) {
+      console.error('Ошибка определения города:', error);
+      loadMeetings(55.6, 55.8, 37.3, 37.7);
+    }
+  };
+
+  loadUserCity();
+}, [location.pathname]);
+
+useEffect(() => {
+  if (emptyStateTimerRef.current) clearTimeout(emptyStateTimerRef.current);
+
+  if (!loadingMeetings && meetings.length === 0) {
+    emptyStateTimerRef.current = setTimeout(() => {
+      setShowEmptyState(true);
+    }, 400);
+  } else {
+    setShowEmptyState(false);
+  }
+
+  return () => {
+    if (emptyStateTimerRef.current) clearTimeout(emptyStateTimerRef.current);
+  };
+}, [loadingMeetings, meetings.length]);
 
  const handleMeetingCreated = (lat: number, lng: number) => {
   loadMeetings(lat - 0.01, lat + 0.01, lng - 0.01, lng + 0.01);
@@ -128,8 +307,24 @@ export default function MapPage() {
     }
   };
 
-  console.log('YANDEX API KEY:', import.meta.env.VITE_YANDEX_API_KEY);
-  console.log('GEOCODER API KEY:', import.meta.env.VITE_YANDEX_GEOCODER_API_KEY);
+  const handleGeolocate = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          if (mapRef.current) {
+            mapRef.current.setCenter([latitude, longitude], 14);
+          }
+          loadMeetings(latitude - 0.01, latitude + 0.01, longitude - 0.01, longitude + 0.01);
+        },
+        () => {
+          showToast('Не удалось получить местоположение', 'error');
+        }
+      );
+    } else {
+      showToast('Геолокация не поддерживается', 'error');
+    }
+  };
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
@@ -143,22 +338,81 @@ export default function MapPage() {
         borderRadius: '8px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
       }}>
-        <span>{user?.userName}</span>
-        <button onClick={() => navigate('/profile')} style={{ marginLeft: 10, marginRight: 10 }}>Профиль</button>
-        <button onClick={handleLogout} style={{ marginLeft: 10 }}>Выйти</button>
+
+    <input
+      type="text"
+      value={citySearch}
+      placeholder="Введите город"
+      onChange={(e) => handleCitySearch(e.target.value)}
+      onKeyDown={handleCityKeyDown}
+      style={{ padding: '6px 10px', marginRight: 8, width: 150 }}
+    />
+
+    {citySuggestions.length > 0 && (
+      <div style={{
+        position: 'absolute',
+        top: '100%',
+        left: 0,
+        right: 0,
+        background: 'white',
+        border: '1px solid #ddd',
+        borderRadius: 4,
+        maxHeight: 200,
+        overflowY: 'auto',
+        zIndex: 100,
+      }}>
+        {citySuggestions.map((s, index) => (
+          <div
+            key={s}
+            onClick={() => handleCitySelect(s)}
+            style={{
+              padding: '8px 12px',
+              cursor: 'pointer',
+              background: index === selectedSuggestionIndex ? '#e3f2fd' : 'white',
+            }}
+            onMouseEnter={(e) => {
+              setSelectedSuggestionIndex(index);
+              e.currentTarget.style.background = '#f5f5f5';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = index === selectedSuggestionIndex ? '#e3f2fd' : 'white';
+            }}
+          >
+            {s}
+          </div>
+        ))}
+          </div>
+        )}
+
+    <button onClick={handleGeolocate} style={{ marginLeft: 10 }}>📍</button>
+        {user ? (
+          <>
+            <span>{user.userName}</span>
+            <button onClick={() => navigate('/profile')} style={{ marginLeft: 10, marginRight: 10 }}>Профиль</button>
+            <button onClick={handleLogout} style={{ marginLeft: 10 }}>Выйти</button>
+          </>
+        ) : (
+          <button onClick={() => navigate('/login')} style={{ marginLeft: 10 }}>Вход</button>
+        )}
       </div>
 
       <SportFilter selected={selectedSports} onChange={setSelectedSports} />
 
       <YMaps query={{ apikey: import.meta.env.VITE_YANDEX_API_KEY }}>
-        <Map
-          defaultState={{ center: mapCenter, zoom: 12 }}
-          width="100%"
-          height="100%"
-          onClick={handleMapClick}
-          onBoundsChange={handleBoundsChange}
-          instanceRef={mapRef}
-        >
+      <Map
+        defaultState={{ center: mapCenter, zoom: 12 }}
+        width="100%"
+        height="100%"
+        onClick={handleMapClick}
+        onBoundsChange={handleBoundsChange}
+        instanceRef={(ref) => {
+          mapRef.current = ref;
+          if (ref && pendingCenterRef.current) {
+            ref.setCenter(pendingCenterRef.current, 12);
+            pendingCenterRef.current = null;
+          }
+        }}
+      >
           <Clusterer
             options={{
               preset: 'islands#invertedVClusterIcons',
@@ -197,6 +451,21 @@ export default function MapPage() {
         </Map>
       </YMaps>
 
+      {loadingMeetings && (
+      <div style={{
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        background: 'white',
+        padding: '8px 16px',
+        borderRadius: 8,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        zIndex: 200,
+      }}>
+        Загрузка встреч...
+      </div>
+    )}
+
       {showModal && tempMarker && (
         <CreateMeetingModal
           lat={tempMarker[0]}
@@ -216,6 +485,27 @@ export default function MapPage() {
         }}
         />
       )}
+        {showEmptyState && !showModal && (
+      <div style={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        background: 'white',
+        padding: '24px',
+        borderRadius: 12,
+        boxShadow: '0 2px 16px rgba(0,0,0,0.2)',
+        zIndex: 150,
+        textAlign: 'center',
+        maxWidth: 300,
+      }}>
+        <div style={{ fontSize: 40, marginBottom: 8 }}>🏀</div>
+        <p style={{ fontWeight: 'bold', marginBottom: 4 }}>Здесь пока нет встреч</p>
+        <p style={{ color: '#666', fontSize: 14, marginBottom: 16 }}>
+          Нажмите по карту для создания первой встречи
+        </p>
+      </div>
+    )}
     </div>
   );
 }

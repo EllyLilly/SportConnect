@@ -5,6 +5,8 @@ import { useToast } from '../contexts/ToastContext';
 import EditMeetingModal from './EditMeetingModal';
 import { getErrorMessage } from '../utils/errorMessage';
 import { formatRelativeTime } from '../utils/formatRelativeTime';
+import { useNavigate } from 'react-router-dom';
+import './MeetingCard.css';
 
 interface Participant {
   userId: string;
@@ -57,13 +59,13 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
   const { isAuthenticated } = useAuth();
   const { showToast } = useToast();
   const [joining, setJoining] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const navigate = useNavigate();
 
   const canEdit = meeting.canEdit;
   const canJoin = meeting.canJoin;
   const canLeave = meeting.canLeave;
-
-  
 
   const handleJoin = async () => {
     if (!isAuthenticated) {
@@ -95,6 +97,7 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
   };
 
   const handleLeave = async () => {
+    setLeaving(true);
     try {
       await api.post(`/meetings/${meeting.id}/leave`);
       showToast('Вы вышли из встречи', 'success');
@@ -102,46 +105,44 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
     } catch (err: any) {
       const message = err.response?.data?.message || 'Ошибка';
       showToast(message, 'error');
+    } finally {
+      setLeaving(false);
     }
   };
 
   const handleCancel = async () => {
-  if (!window.confirm('Отменить встречу? Это действие нельзя отменить.')) {
-    return;
-  }
+    if (!window.confirm('Отменить встречу? Это действие нельзя отменить.')) {
+      return;
+    }
 
-  try {
-    await api.post(`/meetings/${meeting.id}/cancel`);
-    showToast('Встреча отменена', 'success');
-    onUpdate();
-    onClose();
-  } catch (err: any) {
-    const message = err.response?.data?.message || 'Ошибка';
-    showToast(message, 'error');
-  }
-};
+    try {
+      await api.post(`/meetings/${meeting.id}/cancel`);
+      showToast('Встреча отменена', 'success');
+      onUpdate();
+      onClose();
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Ошибка';
+      showToast(message, 'error');
+    }
+  };
 
   const progress = meeting.maxParticipants > 0
     ? (meeting.participantsCount / meeting.maxParticipants) * 100
     : 0;
 
+  const canShowGuestButton = !isAuthenticated && (meeting.status === 0 || meeting.status === 1);
+
   return (
-    <div style={{
-      position: 'fixed', top: 0, right: 0, bottom: 0,
-      width: 360, maxWidth: '90vw',
-      background: 'white', zIndex: 1001,
-      boxShadow: '-2px 0 10px rgba(0,0,0,0.15)',
-      padding: 20, overflowY: 'auto',
-    }}>
+    <div className="meeting-card">
       <button onClick={onClose} style={{ float: 'right' }}>✕</button>
 
       {canEdit && (
-          <button
-            onClick={() => setShowEditModal(true)}
-            style={{ float: 'right', marginRight: 8 }}
-          >
-            Редактировать
-          </button>
+        <button
+          onClick={() => setShowEditModal(true)}
+          style={{ float: 'right', marginRight: 8 }}
+        >
+          Редактировать
+        </button>
       )}
 
       {canEdit && (
@@ -207,15 +208,21 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
         {statusLabels[meeting.status]}
       </p>
 
-      {canJoin && (
+      {canShowGuestButton && (
+        <button onClick={() => navigate('/login')} style={{ marginTop: 16 }}>
+          Войдите, чтобы присоединиться и обсудить встречу
+        </button>
+      )}
+
+      {isAuthenticated && canJoin && (
         <button onClick={handleJoin} disabled={joining} style={{ marginTop: 16 }}>
           {joining ? '...' : 'Присоединиться (+)'}
         </button>
       )}
 
-      {canLeave && (
-        <button onClick={handleLeave} style={{ marginTop: 16 }}>
-          Выйти (-)
+      {isAuthenticated && canLeave && (
+        <button onClick={handleLeave} disabled={leaving} style={{ marginTop: 16 }}>
+          {leaving ? '...' : 'Выйти (-)'}
         </button>
       )}
 

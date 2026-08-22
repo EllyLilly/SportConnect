@@ -28,6 +28,7 @@ public class ProfileService
         {
             Email = user.Email ?? string.Empty,
             UserName = user.UserName,
+            City = user.City,
             RadiusMeters = user.RadiusMeters,
             SkillLevel = user.SkillLevel,
             SportIds = user.SportPreferences.Select(sp => sp.SportId).ToList()
@@ -43,6 +44,7 @@ public class ProfileService
         if (user == null)
             throw new NotFoundException("Пользователь не найден");
 
+        user.City = dto.City;
         user.RadiusMeters = dto.RadiusMeters;
         user.SkillLevel = dto.SkillLevel;
 
@@ -59,6 +61,7 @@ public class ProfileService
         {
             Email = user.Email ?? string.Empty,
             UserName = user.UserName,
+            City = user.City,
             RadiusMeters = user.RadiusMeters,
             SkillLevel = user.SkillLevel,
             SportIds = user.SportPreferences.Select(sp => sp.SportId).ToList()
