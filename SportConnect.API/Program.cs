@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using SportConnect.API.Hubs;
 using SportConnect.API.Jobs;
 using SportConnect.API.Middleware;
 using SportConnect.API.Validators;
@@ -69,6 +70,23 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
     };
+
+    // JWT из query string для WebSocket (SignalR)
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/meeting"))
+            {
+                context.Token = accessToken;
+            }
+
+            return Task.CompletedTask;
+        }
+    };
 });
 
 // Сервисы
@@ -126,6 +144,23 @@ builder.Services.AddCors(options =>
                   .AllowCredentials();
         });
 });
+
+// SignalR + Redis Backplane
+var redisConnection = builder.Configuration.GetConnectionString("Redis");
+if (!string.IsNullOrEmpty(redisConnection))
+{
+    builder.Services.AddSignalR()
+        .AddStackExchangeRedis(redisConnection, options =>
+        {
+            options.Configuration.ChannelPrefix = "SportConnect";
+        });
+    Log.Information("SignalR Redis backplane configured");
+}
+else
+{
+    builder.Services.AddSignalR();
+    Log.Warning("Redis connection string not found. SignalR running without backplane.");
+}
 
 // Rate Limiting
 builder.Services.AddRateLimiter(options =>
@@ -204,6 +239,7 @@ app.UseSerilogRequestLogging(options =>
     };
 });
 
+app.MapHub<MeetingHub>("/hubs/meeting");
 app.MapControllers();
 
 app.Run();

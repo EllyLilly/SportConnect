@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -6,6 +6,7 @@ import EditMeetingModal from './EditMeetingModal';
 import { getErrorMessage } from '../utils/errorMessage';
 import { formatRelativeTime } from '../utils/formatRelativeTime';
 import { useNavigate } from 'react-router-dom';
+import { useSignalR } from '../hooks/useSignalR';
 import './MeetingCard.css';
 
 interface Participant {
@@ -62,10 +63,28 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
   const [leaving, setLeaving] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const navigate = useNavigate();
+  console.log('MeetingCard mounted, meetingId:', meeting.id);
+  const { connection, isConnected } = useSignalR('https://localhost:7055/hubs/meeting');
 
   const canEdit = meeting.canEdit;
   const canJoin = meeting.canJoin;
   const canLeave = meeting.canLeave;
+
+  useEffect(() => {
+  if (!isConnected) return;
+
+  console.log('Joining SignalR group:', meeting.id);
+  
+  connection.current?.invoke('JoinMeetingGroup', meeting.id)
+    .then(() => console.log('Joined group successfully'))
+    .catch(err => console.error('JoinMeetingGroup error:', err));
+
+  return () => {
+    console.log('Leaving SignalR group:', meeting.id);
+    connection.current?.invoke('LeaveMeetingGroup', meeting.id)
+      .catch(err => console.error('LeaveMeetingGroup error:', err));
+  };
+}, [isConnected, connection, meeting.id]);
 
   const handleJoin = async () => {
     if (!isAuthenticated) {

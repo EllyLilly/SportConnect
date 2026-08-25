@@ -19,7 +19,19 @@ services:
             retries: 5
             start_period: 5s
         
-        
+    redis:
+        image: redis:7-alpine
+        container_name: redisSC
+        restart: unless-stopped
+        ports:
+            - "6379:6379"
+        volumes:
+            - redis_data:/data
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
       
     pgadmin:
         image: dpage/pgadmin4:latest
@@ -38,5 +50,6 @@ services:
             - "5050:80" 
 volumes:
     postgres_data:
+    redis_data:
     pgadmin_working_dir:
     pgadmin_config_dir:

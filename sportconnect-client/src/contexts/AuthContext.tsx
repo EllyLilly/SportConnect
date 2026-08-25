@@ -8,6 +8,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
+  token: string | null;
   isAuthenticated: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -19,13 +20,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('accessToken'));
   const [loading, setLoading] = useState(true);
 
   // Проверка токена при загрузке приложения
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
+      const storedToken = localStorage.getItem('accessToken');
+      if (!storedToken) {
+        setToken(null);
         setLoading(false);
         return;
       }
@@ -33,8 +36,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const response = await api.get('/auth/me');
         setUser({ userName: response.data.userName, email: response.data.email });
+        setToken(storedToken);
       } catch {
         localStorage.removeItem('accessToken');
+        setToken(null);
         setUser(null);
       } finally {
         setLoading(false);
@@ -48,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await api.post('/auth/login', { email, password });
     const { accessToken, userName, email: userEmail } = response.data;
     localStorage.setItem('accessToken', accessToken);
+    setToken(accessToken);
     setUser({ userName, email: userEmail });
   };
 
@@ -55,11 +61,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await api.post('/auth/register', { userName, email, password });
     const { accessToken, userName: name, email: userEmail } = response.data;
     localStorage.setItem('accessToken', accessToken);
+    setToken(accessToken);
     setUser({ userName: name, email: userEmail });
   };
 
   const logout = () => {
     localStorage.removeItem('accessToken');
+    setToken(null);
     setUser(null);
   };
 
@@ -67,11 +75,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return <div>Загрузка...</div>;
   }
 
+  console.log('AuthProvider render:', {
+  loading,
+  hasToken: !!token,
+  hasUser: !!user,
+  stored: !!localStorage.getItem('accessToken'),
+  });
+
   return (
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated: !!user,
+        token,
+        isAuthenticated: !!user && !!token,
         loading,
         login,
         register,
