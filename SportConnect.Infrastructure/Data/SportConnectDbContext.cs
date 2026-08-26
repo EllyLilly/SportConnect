@@ -125,6 +125,9 @@ namespace SportConnect.Infrastructure.Data
             // Global query filter
             builder.Entity<Message>()
                 .HasQueryFilter(m => !m.IsDeleted);
+
+            builder.Entity<Message>()
+                .HasIndex(m => new { m.UserId, m.SentAt });
         }
     }
 }

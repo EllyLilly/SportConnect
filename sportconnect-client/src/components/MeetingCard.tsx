@@ -8,6 +8,7 @@ import { formatRelativeTime } from '../utils/formatRelativeTime';
 import { useNavigate } from 'react-router-dom';
 import { useSignalR } from '../hooks/useSignalR';
 import './MeetingCard.css';
+import MeetingChat from './MeetingChat';
 
 interface Participant {
   userId: string;
@@ -252,6 +253,13 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
           onUpdated={onUpdate}
         />
       )}
+
+      <MeetingChat
+        meetingId={meeting.id}
+        isReadOnly={meeting.status === 3 || meeting.status === 4}
+        connection={connection}
+        isConnected={isConnected}
+      />
     </div>
   );
 }

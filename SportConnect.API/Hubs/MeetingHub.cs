@@ -1,6 +1,9 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using SportConnect.Application.Services;
 using System.Security.Claims;
+using SportConnect.Application.Exceptions;
+using Microsoft.Extensions.DependencyInjection;
 using System.Text.RegularExpressions;
 
 namespace SportConnect.API.Hubs
@@ -49,6 +52,34 @@ namespace SportConnect.API.Hubs
                 _logger.LogInformation("User {UserId} left group {MeetingId}",
                     Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value, parsedId);
             }
+        }
+
+        public async Task SendMessage(Guid meetingId, string content)
+        {
+            var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out var parsedUserId))
+                throw new HubException("Unauthorized");
+
+            var messageService = Context.GetHttpContext()?.RequestServices
+                .GetRequiredService<MessageService>();
+
+            if (messageService == null)
+                throw new HubException("Service unavailable");
+
+            try
+            {
+                var message = await messageService.CreateAsync(meetingId, parsedUserId, content);
+
+            await Clients.Group(meetingId.ToString())
+                .SendAsync("ReceiveMessage", message);
+
+            }
+            catch (AppException ex)
+            {
+                throw new HubException(ex.Message);
+            }
+
         }
     }
 }
