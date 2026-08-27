@@ -12,6 +12,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using SportConnect.Application.Abstractions;
 
 namespace SportConnect.Application.Services
 {
@@ -19,11 +20,13 @@ namespace SportConnect.Application.Services
     {
         private readonly SportConnectDbContext _context;
         private readonly ILogger<MeetingService> _logger;
+        private readonly IMeetingRealtimeNotifier _notifier;
 
-        public MeetingService(SportConnectDbContext context, ILogger<MeetingService> logger)
+        public MeetingService(SportConnectDbContext context, ILogger<MeetingService> logger, IMeetingRealtimeNotifier notifier)
         {
             _context = context;
             _logger = logger;
+            _notifier = notifier;
         }
 
         public async Task<MeetingDto> CreateAsync(Guid authorId, CreateMeetingDto dto)
@@ -177,6 +180,8 @@ namespace SportConnect.Application.Services
             meeting.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            await _notifier.MeetingCancelledAsync(meetingId);
 
             _logger.LogInformation("Meeting {MeetingId} cancelled by author {UserId}", meetingId, userId);
         }
@@ -386,6 +391,16 @@ namespace SportConnect.Application.Services
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
+                var joinedUser = await _context.Users.FindAsync(userId);
+                var currentCount = await _context.MeetingParticipants
+                    .CountAsync(p => p.MeetingId == meetingId && !p.IsDeleted);
+
+                await _notifier.ParticipantJoinedAsync(
+                    meetingId,
+                    userId,
+                    joinedUser?.UserName ?? "Участник",
+                    currentCount);
+
                 return await GetByIdAsync(meetingId, userId);
             }
             catch (Exception ex)
@@ -430,6 +445,11 @@ namespace SportConnect.Application.Services
             meeting.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            var currentCount = await _context.MeetingParticipants
+    .CountAsync(p => p.MeetingId == meetingId && !p.IsDeleted);
+
+            await _notifier.ParticipantLeftAsync(meetingId, userId, currentCount);
         }
     }
 }

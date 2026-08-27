@@ -74,18 +74,35 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
   useEffect(() => {
   if (!isConnected) return;
 
-  console.log('Joining SignalR group:', meeting.id);
-  
-  connection.current?.invoke('JoinMeetingGroup', meeting.id)
+  const conn = connection.current;
+  if (!conn) return;
+
+  conn.on('ParticipantJoined', (_data: { userId: string; userName: string; currentCount: number }) => {
+  onUpdate();
+  });
+  conn.on('ParticipantLeft', (_data: { userId: string; currentCount: number }) => {
+  onUpdate();
+  });
+  conn.on('StatusChanged', (_status: number) => {
+    onUpdate();
+  });
+  conn.on('MeetingCancelled', () => {
+    onUpdate();
+    onClose();
+  });
+
+  conn.invoke('JoinMeetingGroup', meeting.id)
     .then(() => console.log('Joined group successfully'))
-    .catch(err => console.error('JoinMeetingGroup error:', err));
+    .catch((err) => console.error('JoinMeetingGroup error:', err));
 
   return () => {
-    console.log('Leaving SignalR group:', meeting.id);
-    connection.current?.invoke('LeaveMeetingGroup', meeting.id)
-      .catch(err => console.error('LeaveMeetingGroup error:', err));
+    conn.off('ParticipantJoined');
+    conn.off('ParticipantLeft');
+    conn.off('StatusChanged');
+    conn.off('MeetingCancelled');
+    conn.invoke('LeaveMeetingGroup', meeting.id).catch(() => {});
   };
-}, [isConnected, connection, meeting.id]);
+}, [isConnected, meeting.id]);
 
   const handleJoin = async () => {
     if (!isAuthenticated) {

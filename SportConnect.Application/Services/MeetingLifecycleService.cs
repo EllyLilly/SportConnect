@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using SportConnect.Application.Abstractions;
 
 namespace SportConnect.Application.Services
 {
@@ -15,13 +16,16 @@ namespace SportConnect.Application.Services
     {
         private readonly SportConnectDbContext _context;
         private readonly ILogger<MeetingLifecycleService> _logger;
+        private readonly IMeetingRealtimeNotifier _notifier;
 
         public MeetingLifecycleService(
             SportConnectDbContext context,
-            ILogger<MeetingLifecycleService> logger)
+            ILogger<MeetingLifecycleService> logger,
+            IMeetingRealtimeNotifier notifier)
         {
             _context = context;
             _logger = logger;
+            _notifier = notifier;
         }
 
         /// <summary>
@@ -67,6 +71,18 @@ namespace SportConnect.Application.Services
             }
 
             await _context.SaveChangesAsync(cancellationToken);
+
+            foreach (var meeting in meetings)
+            {
+                if (meeting.Status == MeetingStatus.Started)
+                {
+                    await _notifier.StatusChangedAsync(meeting.Id, MeetingStatus.Started);
+                }
+                else if (meeting.Status == MeetingStatus.Cancelled)
+                {
+                    await _notifier.MeetingCancelledAsync(meeting.Id, cancellationToken);
+                }
+            }
         }
 
         /// <summary>
@@ -96,6 +112,11 @@ namespace SportConnect.Application.Services
             }
 
             await _context.SaveChangesAsync(cancellationToken);
+
+            foreach (var meeting in meetings)
+            {
+                await _notifier.StatusChangedAsync(meeting.Id, MeetingStatus.Completed);
+            }
         }
 
         /// <summary>
