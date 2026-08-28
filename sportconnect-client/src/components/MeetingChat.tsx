@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import { formatRelativeTime } from '../utils/formatRelativeTime';
-import type { HubConnection } from '@microsoft/signalr';
+import { formatMessageTime } from '../utils/formatMessageTime';
+import { HubConnection, HubConnectionState } from '@microsoft/signalr';
 import './MeetingChat.css';
 
 interface ChatMessage {
@@ -20,6 +20,7 @@ interface MeetingChatProps {
   isReadOnly: boolean;
   connection: React.MutableRefObject<HubConnection | null>;
   isConnected: boolean;
+  connectionState: HubConnectionState;
 }
 
 export default function MeetingChat({
@@ -27,6 +28,7 @@ export default function MeetingChat({
   isReadOnly,
   connection,
   isConnected,
+  connectionState,
 }: MeetingChatProps) {
   const { user, isAuthenticated } = useAuth();
   const { showToast } = useToast();
@@ -124,62 +126,89 @@ export default function MeetingChat({
     e.target.style.height = e.target.scrollHeight + 'px';
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="meeting-chat">
-        <p className="chat-placeholder">Войдите, чтобы видеть чат встречи</p>
-      </div>
-    );
-  }
+    const dotColor =
+    connectionState === HubConnectionState.Connected
+        ? '#4CAF50'
+        : connectionState === HubConnectionState.Reconnecting ||
+        connectionState === HubConnectionState.Connecting
+        ? '#FFC107'
+        : '#f44336';
 
+    const dotTitle =
+    connectionState === HubConnectionState.Connected
+        ? 'Подключено'
+        : connectionState === HubConnectionState.Reconnecting ||
+        connectionState === HubConnectionState.Connecting
+        ? 'Переподключение'
+        : 'Нет соединения';
+
+  if (!isAuthenticated) {
   return (
     <div className="meeting-chat">
-      <div className="chat-header">
-        <span>Чат встречи</span>
-        {isReadOnly && <span className="chat-readonly">Только чтение</span>}
-      </div>
-
-      <div className="chat-messages">
-        {loadingHistory ? (
-          <p className="chat-placeholder">Загрузка сообщений...</p>
-        ) : messages.length === 0 ? (
-          <p className="chat-placeholder">Сообщений пока нет</p>
-        ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`chat-message ${msg.userId === user?.id ? 'own' : ''}`}
-            >
-              <div className="chat-message-header">
-                <strong>{msg.userName}</strong>
-                <span>{formatRelativeTime(msg.sentAt)}</span>
-              </div>
-              <div className="chat-message-content">{msg.content}</div>
-            </div>
-          ))
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {!isReadOnly && (
-        <div className="chat-input-area">
-          <textarea
-            ref={textareaRef}
-            value={newMessage}
-            onChange={handleInput}
-            onKeyDown={handleKeyDown}
-            placeholder="Написать сообщение... (Enter — отправить)"
-            rows={1}
-            disabled={sending || !isConnected}
-          />
-          <button
-            onClick={handleSend}
-            disabled={sending || !isConnected || !newMessage.trim()}
-          >
-            {sending ? '...' : '➤'}
-          </button>
-        </div>
-      )}
+      <p className="chat-placeholder">Войдите, чтобы видеть чат встречи</p>
     </div>
   );
 }
+
+return (
+  <div className="meeting-chat">
+    <div className="chat-header">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span
+          title={dotTitle}
+          style={{
+            display: 'inline-block',
+            width: 10,
+            height: 10,
+            borderRadius: '50%',
+            background: dotColor,
+          }}
+        />
+        <span>Чат встречи</span>
+      </div>
+      {isReadOnly && <span className="chat-readonly">Только чтение</span>}
+    </div>
+
+    <div className="chat-messages">
+      {loadingHistory ? (
+        <p className="chat-placeholder">Загрузка сообщений...</p>
+      ) : messages.length === 0 ? (
+        <p className="chat-placeholder">Сообщений пока нет</p>
+      ) : (
+        messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={`chat-message ${msg.userId === user?.id ? 'own' : ''}`}
+          >
+            <div className="chat-message-header">
+              <strong>{msg.userName}</strong>
+              <span>{formatMessageTime(msg.sentAt)}</span>
+            </div>
+            <div className="chat-message-content">{msg.content}</div>
+          </div>
+        ))
+      )}
+      <div ref={messagesEndRef} />
+    </div>
+
+    {!isReadOnly && (
+      <div className="chat-input-area">
+        <textarea
+          ref={textareaRef}
+          value={newMessage}
+          onChange={handleInput}
+          onKeyDown={handleKeyDown}
+          placeholder="Написать сообщение... (Enter — отправить)"
+          rows={1}
+          disabled={sending || !isConnected}
+        />
+        <button
+          onClick={handleSend}
+          disabled={sending || !isConnected || !newMessage.trim()}
+        >
+          {sending ? '...' : '➤'}
+        </button>
+      </div>
+    )}
+  </div>
+); }

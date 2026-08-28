@@ -65,7 +65,7 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
   const [showEditModal, setShowEditModal] = useState(false);
   const navigate = useNavigate();
   console.log('MeetingCard mounted, meetingId:', meeting.id);
-  const { connection, isConnected } = useSignalR('https://localhost:7055/hubs/meeting');
+  const { connection, isConnected, connectionState } = useSignalR('https://localhost:7055/hubs/meeting');
 
   const canEdit = meeting.canEdit;
   const canJoin = meeting.canJoin;
@@ -276,7 +276,8 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
         isReadOnly={meeting.status === 3 || meeting.status === 4}
         connection={connection}
         isConnected={isConnected}
-      />
+        connectionState={connectionState}
+        />
     </div>
   );
 }
