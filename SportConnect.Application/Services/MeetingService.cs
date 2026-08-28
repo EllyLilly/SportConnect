@@ -337,10 +337,21 @@ namespace SportConnect.Application.Services
 
             try
             {
-                var meeting = await _context.Meetings
-                    .FromSqlInterpolated($"SELECT * FROM \"Meetings\" WHERE \"Id\" = {meetingId} FOR UPDATE")
-                    .IgnoreQueryFilters()
-                    .FirstOrDefaultAsync();
+                Meeting? meeting;
+
+                if (_context.Database.IsRelational())
+                {
+                    meeting = await _context.Meetings
+                        .FromSqlInterpolated($"SELECT * FROM \"Meetings\" WHERE \"Id\" = {meetingId} FOR UPDATE")
+                        .IgnoreQueryFilters()
+                        .FirstOrDefaultAsync();
+                }
+                else
+                {
+                    meeting = await _context.Meetings
+                        .IgnoreQueryFilters()
+                        .FirstOrDefaultAsync(m => m.Id == meetingId);
+                }
 
                 if (meeting == null)
                     throw new NotFoundException("Встреча не найдена");
