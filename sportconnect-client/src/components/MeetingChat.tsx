@@ -6,6 +6,20 @@ import { formatMessageTime } from '../utils/formatMessageTime';
 import { HubConnection, HubConnectionState } from '@microsoft/signalr';
 import './MeetingChat.css';
 
+function invokeWithTimeout<T>(promise: Promise<T>, ms = 8000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<T>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error('Timeout: нет ответа от сервера')),
+      ms,
+    );
+  });
+  return Promise.race([
+    promise.finally(() => clearTimeout(timer)),
+    timeout,
+  ]);
+}
+
 interface ChatMessage {
   id: string;
   meetingId: string;
@@ -33,6 +47,35 @@ export default function MeetingChat({
   const { user, isAuthenticated } = useAuth();
   const { showToast } = useToast();
 
+  const [online, setOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+  const onOffline = () => {
+    setOnline(false);
+    showToast('Нет соединения', 'error');
+  };
+  const onOnline = () => {
+    setOnline(true);
+  };
+  window.addEventListener('offline', onOffline);
+  window.addEventListener('online', onOnline);
+  return () => {
+    window.removeEventListener('offline', onOffline);
+    window.removeEventListener('online', onOnline);
+  };
+}, []);
+
+    useEffect(() => {
+    const goOffline = () => setOnline(false);
+    const goOnline = () => setOnline(true);
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online', goOnline);
+    return () => {
+        window.removeEventListener('offline', goOffline);
+        window.removeEventListener('online', goOnline);
+    };
+    }, []);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -55,12 +98,12 @@ export default function MeetingChat({
       }
     };
 
-    if (isAuthenticated) {
+    if (isAuthenticated && isConnected) {
       loadHistory();
     } else {
       setLoadingHistory(false);
     }
-  }, [meetingId, isAuthenticated]);
+  }, [meetingId, isAuthenticated, isConnected]);
 
   // Подписка на новые сообщения
   useEffect(() => {
@@ -89,29 +132,47 @@ export default function MeetingChat({
   }, [messages]);
 
   const handleSend = async () => {
-    const content = newMessage.trim();
+  const content = newMessage.trim();
+  if (!content || sending) return;
 
-    if (!content || sending || !connection.current || !isConnected) {
-      if (!isConnected) {
-        showToast('Чат не подключён', 'error');
-      }
-      return;
+  if (!navigator.onLine) {
+    showToast('Нет соединения. Сообщение не отправлено.', 'error');
+    return;
+  }
+
+  const conn = connection.current;
+  const live = conn?.state === HubConnectionState.Connected;
+
+  if (!conn || !live) {
+    showToast('Чат не подключён', 'error');
+    return;
+  }
+
+  setSending(true);
+  try {
+    await invokeWithTimeout(conn.invoke('SendMessage', meetingId, content));
+    setNewMessage('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
     }
-
-    setSending(true);
-    try {
-      await connection.current.invoke('SendMessage', meetingId, content);
-      setNewMessage('');
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-      }
-    } catch (err: any) {
-      console.error('Send message error:', err);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err ?? '');
+    if (message.includes('Слишком много')) {
+      showToast('Слишком много сообщений. Подождите минуту.', 'error');
+    } else if (
+      message.includes('Timeout') ||
+      message.includes('Failed to fetch') ||
+      message.includes('connection') ||
+      !navigator.onLine
+    ) {
+      showToast('Нет соединения. Сообщение не отправлено.', 'error');
+    } else {
       showToast('Не удалось отправить сообщение', 'error');
-    } finally {
-      setSending(false);
     }
-  };
+  } finally {
+    setSending(false);
+  }
+};
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -126,13 +187,14 @@ export default function MeetingChat({
     e.target.style.height = e.target.scrollHeight + 'px';
   };
 
-    const dotColor =
-    connectionState === HubConnectionState.Connected
-        ? '#4CAF50'
-        : connectionState === HubConnectionState.Reconnecting ||
-        connectionState === HubConnectionState.Connecting
-        ? '#FFC107'
-        : '#f44336';
+    const dotColor = !online
+  ? '#f44336'
+  : connectionState === HubConnectionState.Connected
+    ? '#4CAF50'
+    : connectionState === HubConnectionState.Reconnecting ||
+      connectionState === HubConnectionState.Connecting
+      ? '#FFC107'
+      : '#f44336';
 
     const dotTitle =
     connectionState === HubConnectionState.Connected

@@ -12,10 +12,12 @@ namespace SportConnect.API.Hubs
     public class MeetingHub : Hub
     {
         private readonly ILogger<MeetingHub> _logger;
+        private readonly IServiceScopeFactory _scopeFactory;
 
-        public MeetingHub(ILogger<MeetingHub> logger)
+        public MeetingHub(ILogger<MeetingHub> logger, IServiceScopeFactory scopeFactory)
         {
             _logger = logger;
+            _scopeFactory = scopeFactory;
         }
 
         public override async Task OnConnectedAsync()
@@ -61,25 +63,19 @@ namespace SportConnect.API.Hubs
             if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out var parsedUserId))
                 throw new HubException("Unauthorized");
 
-            var messageService = Context.GetHttpContext()?.RequestServices
-                .GetRequiredService<MessageService>();
-
-            if (messageService == null)
-                throw new HubException("Service unavailable");
+            using var scope = _scopeFactory.CreateScope();
+            var messageService = scope.ServiceProvider.GetRequiredService<MessageService>();
 
             try
             {
                 var message = await messageService.CreateAsync(meetingId, parsedUserId, content);
-
-            await Clients.Group(meetingId.ToString())
-                .SendAsync("ReceiveMessage", message);
-
+                await Clients.Group(meetingId.ToString())
+                    .SendAsync("ReceiveMessage", message);
             }
             catch (AppException ex)
             {
                 throw new HubException(ex.Message);
             }
-
         }
     }
 }

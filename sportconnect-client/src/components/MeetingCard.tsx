@@ -92,8 +92,11 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
   });
 
   conn.invoke('JoinMeetingGroup', meeting.id)
-    .then(() => console.log('Joined group successfully'))
-    .catch((err) => console.error('JoinMeetingGroup error:', err));
+  .then(() => {
+    console.log('Joined group successfully');
+    onUpdate();
+  })
+  .catch((err) => console.error('JoinMeetingGroup error:', err));
 
   return () => {
     conn.off('ParticipantJoined');
