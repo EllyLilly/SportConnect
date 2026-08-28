@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SportConnect.Application.Services;
+using SportConnect.Core.DTOs.Meetings;
 using SportConnect.Core.DTOs.Profile;
 
 namespace SportConnect.API.Controllers
@@ -12,11 +13,16 @@ namespace SportConnect.API.Controllers
     {
         private readonly ProfileService _profileService;
         private readonly CurrentUserService _currentUserService;
+        private readonly MeetingService _meetingService;
 
-        public ProfileController(ProfileService profileService, CurrentUserService currentUserService)
+        public ProfileController(
+            ProfileService profileService, 
+            CurrentUserService currentUserService,
+            MeetingService meetingService)
         {
             _profileService = profileService;
             _currentUserService = currentUserService;
+            _meetingService = meetingService;
         }
 
         [HttpGet]
@@ -37,6 +43,16 @@ namespace SportConnect.API.Controllers
 
             var profile = await _profileService.UpdateProfileAsync(_currentUserService.UserId.Value, dto);
             return Ok(profile);
+        }
+
+        [HttpGet("meetings")]
+        public async Task<ActionResult<List<MeetingHistoryItemDto>>> GetMyMeetings([FromQuery] string filter = "active")
+        {
+            if (_currentUserService.UserId == null)
+                return Unauthorized();
+
+            var meetings = await _meetingService.GetUserMeetingsAsync(_currentUserService.UserId.Value, filter);
+            return Ok(meetings);
         }
     }
 }

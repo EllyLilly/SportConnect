@@ -451,5 +451,49 @@ namespace SportConnect.Application.Services
 
             await _notifier.ParticipantLeftAsync(meetingId, userId, currentCount);
         }
+
+        public async Task<List<MeetingHistoryItemDto>> GetUserMeetingsAsync(Guid userId, string filter)
+        {
+            var query = _context.Meetings
+                .IgnoreQueryFilters()
+                .Include(m => m.Sport)
+                .Include(m => m.Participants)
+                .AsQueryable();
+
+            var isActive = filter == "active";
+
+            if (isActive)
+            {
+                query = query
+                    .Where(m => !m.IsDeleted && !m.IsArchived)
+                    .Where(m => m.Status != MeetingStatus.Completed && m.Status != MeetingStatus.Cancelled)
+                    .Where(m => m.AuthorId == userId || m.Participants.Any(p => p.UserId == userId && !p.IsDeleted));
+            }
+            else // history
+            {
+                query = query
+                    .Where(m => m.AuthorId == userId || m.Participants.Any(p => p.UserId == userId && !p.IsDeleted))
+                    .Where(m => m.IsArchived || m.Status == MeetingStatus.Completed || m.Status == MeetingStatus.Cancelled);
+            }
+
+            var meetings = await query
+                .OrderByDescending(m => m.ScheduledAt)
+                .ToListAsync();
+
+            return meetings.Select(m => new MeetingHistoryItemDto
+            {
+                Id = m.Id,
+                Title = m.Title,
+                SportName = m.Sport?.Name ?? "Спорт",
+                SportColor = m.Sport?.Color ?? "#000000",
+                Status = m.Status,
+                ScheduledAt = m.ScheduledAt,
+                ParticipantsCount = m.Participants.Count(p => !p.IsDeleted),
+                MaxParticipants = m.MaxParticipants,
+                IsReadOnly = m.IsArchived || m.Status == MeetingStatus.Completed || m.Status == MeetingStatus.Cancelled,
+                Latitude = m.Location?.Y ?? 0,
+                Longitude = m.Location?.X ?? 0
+            }).ToList();
+        }
     }
 }

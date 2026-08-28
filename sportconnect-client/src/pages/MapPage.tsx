@@ -203,6 +203,20 @@ export default function MapPage() {
   useEffect(() => {
   const loadUserCity = async () => {
     try {
+      // Координаты из навигации (кнопка "Показать на карте")
+      const navState = location.state as { lat?: number; lng?: number } | null;
+      if (navState?.lat != null && navState?.lng != null) {
+        const { lat, lng } = navState;
+        setMapCenter([lat, lng]);
+        pendingCenterRef.current = [lat, lng];
+        if (mapRef.current) {
+          mapRef.current.setCenter([lat, lng], 12);
+          pendingCenterRef.current = null;
+        }
+        localStorage.setItem('mapCenter', JSON.stringify([lat, lng]));
+        loadMeetings(lat - 0.01, lat + 0.01, lng - 0.01, lng + 0.01);
+        return;
+      }
       //город с главной стр
       const manualCity = localStorage.getItem('manualCity');
       if (manualCity) {
@@ -222,18 +236,23 @@ export default function MapPage() {
         }
       }
       
-      // Если есть localStorage, то он используется, при условии что он актуальнее
+      // Если есть сохраненный центр карты
       const saved = localStorage.getItem('mapCenter');
       if (saved) {
-        const [lat, lng] = JSON.parse(saved);
-        setMapCenter([lat, lng]);
-        pendingCenterRef.current = [lat, lng];
-        if (mapRef.current) {
-          mapRef.current.setCenter([lat, lng], 12);
-          pendingCenterRef.current = null;
+        const parsed = JSON.parse(saved);
+        const lat = Array.isArray(parsed) ? parsed[0] : parsed.lat;
+        const lng = Array.isArray(parsed) ? parsed[1] : parsed.lng;
+
+        if (typeof lat === 'number' && typeof lng === 'number') {
+          setMapCenter([lat, lng]);
+          pendingCenterRef.current = [lat, lng];
+          if (mapRef.current) {
+            mapRef.current.setCenter([lat, lng], 12);
+            pendingCenterRef.current = null;
+          }
+          loadMeetings(lat - 0.01, lat + 0.01, lng - 0.01, lng + 0.01);
+          return;
         }
-        loadMeetings(lat - 0.01, lat + 0.01, lng - 0.01, lng + 0.01);
-        return;
       }
 
       //город из профиля
@@ -262,7 +281,7 @@ export default function MapPage() {
   };
 
   loadUserCity();
-}, [location.pathname]);
+}, [location.pathname, location.state]);
 
 useEffect(() => {
   if (emptyStateTimerRef.current) clearTimeout(emptyStateTimerRef.current);
