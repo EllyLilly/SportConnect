@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -12,9 +13,11 @@ using SportConnect.Infrastructure.Data;
 namespace SportConnect.Infrastructure.Migrations
 {
     [DbContext(typeof(SportConnectDbContext))]
-    partial class SportConnectDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260830080652_AddTelegramEntities")]
+    partial class AddTelegramEntities
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -301,47 +304,6 @@ namespace SportConnect.Infrastructure.Migrations
                     b.ToTable("Messages");
                 });
 
-            modelBuilder.Entity("SportConnect.Infrastructure.Entities.NotificationLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Content")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("MeetingId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("SentAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "MeetingId", "Type")
-                        .IsUnique()
-                        .HasFilter("\"MeetingId\" IS NOT NULL");
-
-                    b.ToTable("NotificationLogs");
-                });
-
             modelBuilder.Entity("SportConnect.Infrastructure.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -440,59 +402,6 @@ namespace SportConnect.Infrastructure.Migrations
                             Color = "#795548",
                             Name = "Прогулка"
                         });
-                });
-
-            modelBuilder.Entity("SportConnect.Infrastructure.Entities.TelegramConnection", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<long>("ChatId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime>("ConnectedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.HasKey("UserId");
-
-                    b.HasIndex("ChatId")
-                        .IsUnique();
-
-                    b.ToTable("TelegramConnections");
-                });
-
-            modelBuilder.Entity("SportConnect.Infrastructure.Entities.TelegramVerificationCode", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsUsed")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Code");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("TelegramVerificationCodes");
                 });
 
             modelBuilder.Entity("SportConnect.Infrastructure.Entities.User", b =>
@@ -695,40 +604,7 @@ namespace SportConnect.Infrastructure.Migrations
                     b.Navigation("Sender");
                 });
 
-            modelBuilder.Entity("SportConnect.Infrastructure.Entities.NotificationLog", b =>
-                {
-                    b.HasOne("SportConnect.Infrastructure.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("SportConnect.Infrastructure.Entities.RefreshToken", b =>
-                {
-                    b.HasOne("SportConnect.Infrastructure.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("SportConnect.Infrastructure.Entities.TelegramConnection", b =>
-                {
-                    b.HasOne("SportConnect.Infrastructure.Entities.User", "User")
-                        .WithOne()
-                        .HasForeignKey("SportConnect.Infrastructure.Entities.TelegramConnection", "UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("SportConnect.Infrastructure.Entities.TelegramVerificationCode", b =>
                 {
                     b.HasOne("SportConnect.Infrastructure.Entities.User", "User")
                         .WithMany()

@@ -22,10 +22,55 @@ namespace SportConnect.Infrastructure.Data
         public DbSet<Message> Messages { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<UserSportPreference> UserSportPreferences { get; set; }
+        public DbSet<TelegramConnection> TelegramConnections { get; set; }
+        public DbSet<TelegramVerificationCode> TelegramVerificationCodes { get; set; }
+        public DbSet<NotificationLog> NotificationLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
             SportSeeder.Seed(builder);
+
+            // --- TelegramConnection ---
+            builder.Entity<TelegramConnection>()
+                .HasKey(tc => tc.UserId);
+
+            builder.Entity<TelegramConnection>()
+                .HasOne(tc => tc.User)
+                .WithOne()
+                .HasForeignKey<TelegramConnection>(tc => tc.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<TelegramConnection>()
+                .HasIndex(tc => tc.ChatId)
+                .IsUnique();
+
+            // --- TelegramVerificationCode ---
+            builder.Entity<TelegramVerificationCode>()
+                .HasKey(tvc => tvc.Id);
+
+            builder.Entity<TelegramVerificationCode>()
+                .HasOne(tvc => tvc.User)
+                .WithMany()
+                .HasForeignKey(tvc => tvc.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<TelegramVerificationCode>()
+                .HasIndex(tvc => tvc.Code);
+
+            // --- NotificationLog ---
+            builder.Entity<NotificationLog>()
+                .HasKey(nl => nl.Id);
+
+            builder.Entity<NotificationLog>()
+                .HasOne(nl => nl.User)
+                .WithMany()
+                .HasForeignKey(nl => nl.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<NotificationLog>()
+                .HasIndex(nl => new { nl.UserId, nl.MeetingId, nl.Type })
+                .IsUnique()
+                .HasFilter("\"MeetingId\" IS NOT NULL");
 
             base.OnModelCreating(builder);
 

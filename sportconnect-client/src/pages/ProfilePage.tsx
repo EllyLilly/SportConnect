@@ -50,6 +50,11 @@ export default function ProfilePage() {
   const [tab, setTab] = useState<'profile' | 'active' | 'history'>('profile');
   const [meetings, setMeetings] = useState<MeetingHistoryItem[]>([]);
   const [meetingsLoading, setMeetingsLoading] = useState(false);
+  const [telegramCode, setTelegramCode] = useState('');
+  const [telegramExpiresAt, setTelegramExpiresAt] = useState('');
+  const [telegramConnected, setTelegramConnected] = useState(false);
+  const [telegramLoading, setTelegramLoading] = useState(false);
+  const [telegramTimer, setTelegramTimer] = useState<number | null>(null);
   const { showToast } = useToast();
   const navigate = useNavigate();
 
@@ -66,6 +71,12 @@ export default function ProfilePage() {
         setSkillLevel(profileRes.data.skillLevel);
         setSelectedSportIds(profileRes.data.sportIds);
         setSports(sportsRes.data);
+        try {
+            const telegramRes = await api.get('/profile/telegram/status');
+            setTelegramConnected(telegramRes.data.isConnected);
+          } catch (err) {
+            // игнорируем, тг не подключен
+          }
       } catch (err: any) {
         showToast('Ошибка загрузки профиля', 'error');
       } finally {
@@ -144,12 +155,59 @@ export default function ProfilePage() {
     }
   };
 
+  const handleGenerateCode = async () => {
+  setTelegramLoading(true);
+  try {
+    const res = await api.post('/profile/telegram/generate-code');
+    setTelegramCode(res.data.code);
+    setTelegramExpiresAt(res.data.expiresAt);
+    
+    // Таймер на 10 минут
+    if (telegramTimer) clearInterval(telegramTimer);
+    const timer = setInterval(() => {
+      const expires = new Date(res.data.expiresAt).getTime();
+      const now = Date.now();
+      if (now >= expires) {
+        setTelegramCode('');
+        setTelegramExpiresAt('');
+        clearInterval(timer);
+      }
+    }, 1000);
+    setTelegramTimer(timer);
+    
+    showToast('Код сгенерирован', 'success');
+  } catch (err: any) {
+    showToast('Ошибка генерации кода', 'error');
+  } finally {
+    setTelegramLoading(false);
+  }
+};
+
+  const handleDisconnectTelegram = async () => {
+    setTelegramLoading(true);
+    try {
+      await api.delete('/profile/telegram');
+      setTelegramConnected(false);
+      showToast('Telegram отключён', 'success');
+    } catch (err: any) {
+      showToast('Ошибка отключения', 'error');
+    } finally {
+      setTelegramLoading(false);
+    }
+  };
+
   const showOnMap = (meeting: MeetingHistoryItem) => {
   navigate('/map', {
     state: { lat: meeting.latitude, lng: meeting.longitude },
     });
   };
 
+  useEffect(() => {
+  return () => {
+    if (telegramTimer) clearInterval(telegramTimer);
+  };
+  }, [telegramTimer]);
+  
   if (loading) return <div>Загрузка профиля...</div>;
 
   return (
@@ -272,7 +330,7 @@ export default function ProfilePage() {
           </div>
 
           <div style={{ marginBottom: 20 }}>
-            <label>Интересы (не более 5)</label>
+            <label>Интересы</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', marginTop: 8 }}>
               {sports.map((sport) => (
                 <span
@@ -301,6 +359,52 @@ export default function ProfilePage() {
             </div>
           </div>
 
+          <div style={{ marginBottom: 20, padding: 16, border: '1px solid #ddd', borderRadius: 8 }}>
+  <h3 style={{ marginTop: 0 }}>Telegram-уведомления</h3>
+  
+    {telegramConnected ? (
+      <div>
+        <p style={{ color: '#4CAF50', fontWeight: 'bold' }}>✅ Подключено</p>
+        <button
+          type="button"
+          onClick={handleDisconnectTelegram}
+          disabled={telegramLoading}
+          style={{ padding: '8px 16px', background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+        >
+          Отключить
+        </button>
+      </div>
+    ) : (
+      <div>
+        <p style={{ marginBottom: 12 }}>
+          1. Найди бота <strong>@SportConnectBot</strong> в Telegram<br/>
+          2. Отправь команду <code>/start</code><br/>
+          3. Сгенерируй код и отправь боту <code>/connect &lt;код&gt;</code>
+        </p>
+        
+        {telegramCode ? (
+          <div style={{ marginBottom: 12 }}>
+            <p style={{ fontSize: '24px', fontWeight: 'bold', letterSpacing: '4px', margin: '8px 0' }}>
+              {telegramCode}
+            </p>
+            <p style={{ fontSize: '12px', color: '#666' }}>
+              Код действует до: {new Date(telegramExpiresAt).toLocaleTimeString()}
+            </p>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleGenerateCode}
+            disabled={telegramLoading}
+            style={{ padding: '10px 20px', background: '#2196F3', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+          >
+            {telegramLoading ? 'Генерация...' : 'Сгенерировать код'}
+          </button>
+        )}
+      </div>
+    )}
+  </div>
+          
           <div style={{ display: 'flex', gap: 10 }}>
             <button type="submit" style={{ padding: '10px 20px' }}>
               Сохранить
