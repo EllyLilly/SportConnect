@@ -21,12 +21,14 @@ namespace SportConnect.Application.Services
         private readonly SportConnectDbContext _context;
         private readonly ILogger<MeetingService> _logger;
         private readonly IMeetingRealtimeNotifier _notifier;
+        private readonly NotificationService _notificationService;
 
-        public MeetingService(SportConnectDbContext context, ILogger<MeetingService> logger, IMeetingRealtimeNotifier notifier)
+        public MeetingService(SportConnectDbContext context, ILogger<MeetingService> logger, IMeetingRealtimeNotifier notifier, NotificationService notificationService)
         {
             _context = context;
             _logger = logger;
             _notifier = notifier;
+            _notificationService = notificationService;
         }
 
         public async Task<MeetingDto> CreateAsync(Guid authorId, CreateMeetingDto dto)
@@ -70,6 +72,9 @@ namespace SportConnect.Application.Services
             });
 
             await _context.SaveChangesAsync();
+
+            // После сохранения встречи в БД уведомления идет в очередь
+            await _notificationService.QueueNotificationsForMeetingAsync(meeting.Id);
 
             return await GetByIdAsync(meeting.Id, authorId);
         }
