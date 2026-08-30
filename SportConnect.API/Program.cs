@@ -17,13 +17,11 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 
-Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Information()
-    .WriteTo.Console()
-    .WriteTo.File("logs/log-.txt", rollingInterval: RollingInterval.Day)
-    .CreateLogger();
-
 var builder = WebApplication.CreateBuilder(args);
+
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .CreateLogger();
 
 builder.Host.UseSerilog();
 
@@ -38,6 +36,23 @@ var connectionString = builder.Configuration.GetConnectionString("SportConnectCo
 builder.Services.AddDbContext<SportConnectDbContext>(options =>
     options.UseNpgsql(connectionString, npgsqlOptions =>
         npgsqlOptions.UseNetTopologySuite()));
+
+// Redis Cache
+var redisConnection = builder.Configuration.GetConnectionString("Redis");
+if (!string.IsNullOrEmpty(redisConnection))
+{
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnection;
+        options.InstanceName = "sportconnect:cache:";
+    });
+    Log.Information("Redis cache configured");
+}
+else
+{
+    builder.Services.AddDistributedMemoryCache();
+    Log.Warning("Redis connection string not found. Using in-memory cache.");
+}
 
 // Identity
 builder.Services.AddIdentity<User, IdentityRole<Guid>>()
@@ -155,7 +170,7 @@ builder.Services.AddCors(options =>
 });
 
 // SignalR + Redis Backplane
-var redisConnection = builder.Configuration.GetConnectionString("Redis");
+redisConnection = builder.Configuration.GetConnectionString("Redis");
 if (!string.IsNullOrEmpty(redisConnection))
 {
     builder.Services.AddSignalR()

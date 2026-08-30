@@ -32,6 +32,40 @@ services:
             interval: 5s
             timeout: 5s
             retries: 5
+
+    api:
+        build:
+            context: .
+            dockerfile: SportConnect.API/Dockerfile
+        container_name: sportconnect-api
+        restart: unless-stopped
+        environment:
+            ConnectionStrings__SportConnectConnection: "Host=postgres;Port=5432;Database=sportconnectdb;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+            ConnectionStrings__Redis: "redis:6379"
+            Jwt__Key: ${JWT_KEY}
+            Jwt__Issuer: ${JWT_ISSUER}
+            Jwt__Audience: ${JWT_AUDIENCE}
+            Telegram__BotToken: ${TELEGRAM_BOT_TOKEN}
+        depends_on:
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+        ports:
+            - "8080:8080"
+        volumes:
+            - ./logs:/app/logs
+
+    frontend:
+        build:
+            context: ./sportconnect-client
+            dockerfile: Dockerfile
+        container_name: sportconnect-frontend
+        restart: unless-stopped
+        depends_on:
+            - api
+        ports:
+            - "3000:80"
       
     pgadmin:
         image: dpage/pgadmin4:latest

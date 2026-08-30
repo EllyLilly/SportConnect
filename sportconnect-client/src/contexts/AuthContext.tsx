@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from '
 import api from '../api/axios';
 
 interface User {
+  id: string;
   userName: string;
   email: string;
 }
@@ -35,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const response = await api.get('/auth/me');
-        setUser({ userName: response.data.userName, email: response.data.email });
+        setUser({ id: response.data.id, userName: response.data.userName, email: response.data.email });
         setToken(storedToken);
       } catch {
         localStorage.removeItem('accessToken');
@@ -54,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { accessToken, userName, email: userEmail } = response.data;
     localStorage.setItem('accessToken', accessToken);
     setToken(accessToken);
-    setUser({ userName, email: userEmail });
+    setUser({ id: response.data.id, userName, email: userEmail });
   };
 
   const register = async (userName: string, email: string, password: string) => {
@@ -62,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { accessToken, userName: name, email: userEmail } = response.data;
     localStorage.setItem('accessToken', accessToken);
     setToken(accessToken);
-    setUser({ userName: name, email: userEmail });
+    setUser({ id: response.data.id, userName: name, email: userEmail });
   };
 
   const logout = () => {

@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://localhost:7055/api';
+
 const api = axios.create({
-  baseURL: 'https://localhost:7055/api',
+  baseURL: API_BASE_URL,
   withCredentials: true
 });
 
@@ -23,7 +25,7 @@ api.interceptors.response.use(
 
       try {
         const response = await axios.post(
-          'https://localhost:7055/api/auth/refresh',
+          `${API_BASE_URL}/auth/refresh`,
           {},
           { withCredentials: true }
         );
@@ -35,7 +37,6 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch {
         localStorage.removeItem('accessToken');
-        // Нет редиректа для гостя, чтобы он просматривал карту без входа
         return Promise.reject(error);
       }
     }
