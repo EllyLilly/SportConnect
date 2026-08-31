@@ -108,6 +108,7 @@ namespace SportConnect.Application.Services
         {
             var userId = _currentUser.UserId;
             var connection = await _db.TelegramConnections
+                .AsNoTracking()
                 .FirstOrDefaultAsync(tc => tc.UserId == userId && tc.IsActive, ct);
 
             return new TelegramStatusDto
@@ -120,6 +121,7 @@ namespace SportConnect.Application.Services
         public async Task<long?> GetChatIdByUserIdAsync(Guid userId, CancellationToken ct = default)
         {
             var connection = await _db.TelegramConnections
+                .AsNoTracking()
                 .FirstOrDefaultAsync(tc => tc.UserId == userId && tc.IsActive, ct);
 
             return connection?.ChatId;

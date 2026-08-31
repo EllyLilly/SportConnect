@@ -24,6 +24,7 @@ namespace SportConnect.Application.Services
         public async Task QueueNotificationsForMeetingAsync(Guid meetingId, CancellationToken ct = default)
         {
             var meeting = await _db.Meetings
+                .AsNoTracking()
                 .Include(m => m.Sport)
                 .FirstOrDefaultAsync(m => m.Id == meetingId, ct);
 

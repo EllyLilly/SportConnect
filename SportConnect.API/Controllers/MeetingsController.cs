@@ -19,6 +19,14 @@ namespace SportConnect.API.Controllers
             _currentUserService = currentUserService;
         }
 
+        /// <summary>
+        /// Создать новую встречу
+        /// </summary>
+        /// <response code="201">Встреча создана</response>
+        /// <response code="400">Ошибка валидации</response>
+        /// <response code="401">Пользователь не авторизован</response>
+        /// <response code="409">Превышен лимит активных встреч</response>
+        /// <response code="429">Превышен лимит запросов</response>
         [HttpPost]
         [Authorize]
         [EnableRateLimiting("CreateMeeting")]
@@ -31,6 +39,11 @@ namespace SportConnect.API.Controllers
             return CreatedAtAction(nameof(GetById), new { id = meeting.Id }, meeting);
         }
 
+        /// <summary>
+        /// Получить встречу по ID
+        /// </summary>
+        /// <response code="200">Встреча найдена</response>
+        /// <response code="404">Встреча не найдена</response>
         [HttpGet("{id:guid}")]
         public async Task<ActionResult<MeetingDto>> GetById(Guid id)
         {
@@ -38,6 +51,14 @@ namespace SportConnect.API.Controllers
             return Ok(meeting);
         }
 
+        /// <summary>
+        /// Обновить встречу (только автор)
+        /// </summary>
+        /// <response code="200">Встреча обновлена</response>
+        /// <response code="400">Ошибка валидации</response>
+        /// <response code="401">Пользователь не авторизован</response>
+        /// <response code="403">Пользователь не автор встречи</response>
+        /// <response code="404">Встреча не найдена</response>
         [HttpPut("{id:guid}")]
         [Authorize]
         public async Task<ActionResult<MeetingDto>> Update(Guid id, [FromBody] UpdateMeetingDto dto)
@@ -49,6 +70,13 @@ namespace SportConnect.API.Controllers
             return Ok(meeting);
         }
 
+        /// <summary>
+        /// Отменить встручу (только автор)
+        /// </summary>
+        /// <response code="204">Встреча отменена</response>
+        /// <response code="401">Пользователь не авторизован</response>
+        /// <response code="403">Пользователь не автор встречи</response>
+        /// <response code="404">Встреча не найдена</response>
         [HttpPost("{id:guid}/cancel")]
         [Authorize]
         public async Task<ActionResult> Cancel(Guid id)
@@ -60,6 +88,10 @@ namespace SportConnect.API.Controllers
             return NoContent();
         }
 
+        /// <summary>
+        /// Получить встречи рядом
+        /// </summary>
+        /// <response code="200">Список встреч в заданных границах</response>
         [HttpGet("nearby")]
         public async Task<ActionResult<List<MeetingListItemDto>>> GetNearby(
             [FromQuery] double minLat,
@@ -72,6 +104,14 @@ namespace SportConnect.API.Controllers
             return Ok(meetings);
         }
 
+        /// <summary>
+        /// Присоединиться к встрече
+        /// </summary>
+        /// <response code="200">Успешное присоединение</response>
+        /// <response code="401">Пользователь не авторизован</response>
+        /// <response code="404">Встреча не найдена</response>
+        /// <response code="409">Нет свободных мест или встреча завершена</response>
+        /// <response code="429">Превышен лимит запросов</response>
         [HttpPost("{id:guid}/join")]
         [Authorize]
         [EnableRateLimiting("JoinMeeting")]
@@ -84,6 +124,12 @@ namespace SportConnect.API.Controllers
             return Ok(meeting);
         }
 
+        /// <summary>
+        /// Покинуть встречу
+        /// </summary>
+        /// <response code="204">Успешный выход</response>
+        /// <response code="401">Пользователь не авторизован</response>
+        /// <response code="404">Встреча не найдена</response>
         [HttpPost("{id:guid}/leave")]
         [Authorize]
         [EnableRateLimiting("JoinMeeting")]

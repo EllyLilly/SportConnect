@@ -82,6 +82,7 @@ namespace SportConnect.Application.Services
         public async Task<MeetingDto> GetByIdAsync(Guid meetingId, Guid? currentUserId = null)
         {
             var meeting = await _context.Meetings
+                .AsNoTracking()
                 .Include(m => m.Sport)
                 .Include(m => m.Author)
                 .Include(m => m.Participants)
@@ -244,6 +245,7 @@ namespace SportConnect.Application.Services
                 query = query.Where(m => sportIds.Contains(m.SportId));
 
             var meetings = await query
+                .AsNoTracking()
                 .OrderBy(m => m.ScheduledAt)
                 .Take(100)
                 .ToListAsync();
@@ -301,6 +303,7 @@ namespace SportConnect.Application.Services
             }
 
             var meetings = await query
+                .AsNoTracking()
                 .OrderBy(m => m.ScheduledAt)
                 .Take(100)
                 .ToListAsync();
@@ -493,6 +496,7 @@ namespace SportConnect.Application.Services
             }
 
             var meetings = await query
+                .AsNoTracking()
                 .OrderByDescending(m => m.ScheduledAt)
                 .ToListAsync();
 

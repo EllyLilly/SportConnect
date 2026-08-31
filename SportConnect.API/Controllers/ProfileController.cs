@@ -25,6 +25,11 @@ namespace SportConnect.API.Controllers
             _meetingService = meetingService;
         }
 
+        /// <summary>
+        /// Получить профиль текущего пользователя
+        /// </summary>
+        /// <response code="200">Профиль пользователя</response>
+        /// <response code="401">Пользователь не авторизован</response>
         [HttpGet]
         public async Task<ActionResult<ProfileDto>> GetProfile()
         {
@@ -35,6 +40,12 @@ namespace SportConnect.API.Controllers
             return Ok(profile);
         }
 
+        /// <summary>
+        /// Обновить профиль текущего пользователя
+        /// </summary>
+        /// <response code="200">Обновлённый профиль</response>
+        /// <response code="400">Ошибка валидации</response>
+        /// <response code="401">Пользователь не авторизован</response>
         [HttpPut]
         public async Task<ActionResult<ProfileDto>> UpdateProfile([FromBody] UpdateProfileDto dto)
         {
@@ -45,6 +56,12 @@ namespace SportConnect.API.Controllers
             return Ok(profile);
         }
 
+        /// <summary>
+        /// Получить встречи пользователя
+        /// </summary>
+        /// <param name="filter">active — активные, history — завершённые и отменённые</param>
+        /// <response code="200">Список встреч</response>
+        /// <response code="401">Пользователь не авторизован</response>
         [HttpGet("meetings")]
         public async Task<ActionResult<List<MeetingHistoryItemDto>>> GetMyMeetings([FromQuery] string filter = "active")
         {

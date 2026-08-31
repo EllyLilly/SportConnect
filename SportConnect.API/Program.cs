@@ -131,6 +131,13 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
+    options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "SportConnect API",
+        Version = "v1",
+        Description = "API дл€ платформы SportConnect Ч организаци€ спонтанных спортивных встреч."
+    });
+
     options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -155,6 +162,14 @@ builder.Services.AddSwaggerGen(options =>
             Array.Empty<string>()
         }
     });
+
+    // XML-комментарии
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = System.IO.Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (System.IO.File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath);
+    }
 });
 
 builder.Services.AddCors(options =>
@@ -237,6 +252,18 @@ builder.Services.AddRateLimiter(options =>
             }));
 });
 
+// Health Checks
+builder.Services.AddHealthChecks()
+    .AddNpgSql(
+        connectionString: connectionString!,
+        name: "PostgreSQL",
+        timeout: TimeSpan.FromSeconds(5))
+    .AddRedis(
+        redisConnectionString: redisConnection ?? "localhost:6379",
+        name: "Redis",
+        timeout: TimeSpan.FromSeconds(5),
+        failureStatus: null); // редис необ€зателен Ч не рон€ет ready
+
 var app = builder.Build();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
@@ -260,10 +287,35 @@ app.UseSerilogRequestLogging(options =>
     {
         var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         diagnosticContext.Set("UserId", userId ?? "anonymous");
+        diagnosticContext.Set("TraceId", httpContext.TraceIdentifier);
     };
 });
 
 app.MapHub<MeetingHub>("/hubs/meeting");
 app.MapControllers();
+
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = _ => false // зависимости не провер€ютс€, только жив ли процесс
+});
+
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var result = new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description
+            })
+        };
+        await context.Response.WriteAsJsonAsync(result);
+    }
+});
 
 app.Run();

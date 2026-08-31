@@ -65,7 +65,8 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
   const [showEditModal, setShowEditModal] = useState(false);
   const navigate = useNavigate();
   console.log('MeetingCard mounted, meetingId:', meeting.id);
-  const { connection, isConnected, connectionState } = useSignalR('https://localhost:7055/hubs/meeting');
+  const SIGNALR_URL = import.meta.env.VITE_SIGNALR_URL || 'https://localhost:7055/hubs/meeting';
+  const { connection, isConnected, connectionState } = useSignalR(SIGNALR_URL);
 
   const canEdit = meeting.canEdit;
   const canJoin = meeting.canJoin;

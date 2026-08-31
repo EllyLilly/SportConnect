@@ -18,6 +18,7 @@ public class ProfileService
     public async Task<ProfileDto> GetProfileAsync(Guid userId)
     {
         var user = await _context.Users
+            .AsNoTracking()
             .Include(u => u.SportPreferences)
             .FirstOrDefaultAsync(u => u.Id == userId);
 

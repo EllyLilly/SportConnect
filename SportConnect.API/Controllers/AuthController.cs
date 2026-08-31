@@ -23,6 +23,11 @@ namespace SportConnect.API.Controllers
             _userManager = userManager;
         }
 
+        /// <summary>
+        /// Регистрация нового пользователя
+        /// </summary>
+        /// <response code="200">Успешная регистрация, возвращает токены</response>
+        /// <response code="400">Ошибка валидации или пользователь уже существует</response>
         //POST /api/auth/register
         [HttpPost("register")]
         public async Task<ActionResult<AuthResponseDto>> Register(RegisterRequestDto dto)
@@ -31,6 +36,11 @@ namespace SportConnect.API.Controllers
             return Ok(response);
         }
 
+        /// <summary>
+        /// Вход в систему
+        /// </summary>
+        /// <response code="200">Успешный вход, возвращает токены</response>
+        /// <response code="401">Неверный email или пароль</response>
         //POST /api/auth/login
         [HttpPost("login")]
         public async Task<ActionResult<AuthResponseDto>> Login(LoginRequestDto dto)
@@ -39,6 +49,11 @@ namespace SportConnect.API.Controllers
             return Ok(response);
         }
 
+        /// <summary>
+        /// Обновление access-токена по refresh-токену из cookie
+        /// </summary>
+        /// <response code="200">Новый access-токен</response>
+        /// <response code="401">Refresh-токен не найден или недействителен</response>
         //POST /api/auth/refresh
         [HttpPost("refresh")]
         public async Task<ActionResult<AuthResponseDto>> Refresh()
@@ -57,6 +72,11 @@ namespace SportConnect.API.Controllers
             return Ok(response);
         }
 
+        /// <summary>
+        /// Получить информацию о текущем пользователе
+        /// </summary>
+        /// <response code="200">Данные пользователя</response>
+        /// <response code="401">Пользователь не авторизован</response>
         [HttpGet("me")]
         [Authorize]
         public async Task<ActionResult<AuthResponseDto>> Me()

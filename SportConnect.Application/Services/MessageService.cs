@@ -86,6 +86,7 @@ namespace SportConnect.Application.Services
         public async Task<List<MessageDto>> GetHistoryAsync(Guid meetingId, int take = 50)
         {
             var messages = await _context.Messages
+                .AsNoTracking()
                 .Where(m => m.MeetingId == meetingId)
                 .OrderByDescending(m => m.SentAt)
                 .Take(take)

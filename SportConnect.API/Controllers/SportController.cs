@@ -20,6 +20,10 @@ namespace SportConnect.API.Controllers
             _cache = cache;
         }
 
+        /// <summary>
+        /// Получить список всех видов спорта
+        /// </summary>
+        /// <response code="200">Список видов спорта</response>
         [HttpGet]
         public async Task<ActionResult<List<Sport>>> GetAll()
         {

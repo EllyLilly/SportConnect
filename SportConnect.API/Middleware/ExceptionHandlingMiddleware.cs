@@ -23,21 +23,44 @@ namespace SportConnect.API.Middleware
             catch (AppException ex)
             {
                 Log.Error(ex, "Application error: {Message}", ex.Message);
-                context.Response.StatusCode = ex.StatusCode;
-                context.Response.ContentType = "application/json; charset=utf-8";
-                var errorResponse = new { message = ex.Message, statusCode = ex.StatusCode };
-                var json = JsonSerializer.Serialize(errorResponse);
-                await context.Response.WriteAsync(json);
+                await WriteProblemDetailsAsync(context, ex.StatusCode, ex.Message);
             }
             catch (Exception ex)
             {
                 Log.Fatal(ex, "Unhandled exception");
-                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-                context.Response.ContentType = "application/json; charset=utf-8";
-                var errorResponse = new { message = "Внутренняя ошибка сервера", statusCode = 500 };
-                var json = JsonSerializer.Serialize(errorResponse);
-                await context.Response.WriteAsync(json);
+                await WriteProblemDetailsAsync(context, (int)HttpStatusCode.InternalServerError, "Внутренняя ошибка сервера");
             }
         }
+
+        private static async Task WriteProblemDetailsAsync(HttpContext context, int statusCode, string detail)
+        {
+            context.Response.StatusCode = statusCode;
+            context.Response.ContentType = "application/problem+json; charset=utf-8";
+
+            var traceId = context.TraceIdentifier;
+
+            var problemDetails = new
+            {
+                type = $"https://httpstatuses.com/{statusCode}",
+                title = GetTitle(statusCode),
+                status = statusCode,
+                detail = detail,
+                traceId = traceId
+            };
+
+            var json = JsonSerializer.Serialize(problemDetails);
+            await context.Response.WriteAsync(json);
+        }
+
+        private static string GetTitle(int statusCode) => statusCode switch
+        {
+            400 => "Bad Request",
+            401 => "Unauthorized",
+            403 => "Forbidden",
+            404 => "Not Found",
+            409 => "Conflict",
+            429 => "Too Many Requests",
+            _ => "Internal Server Error"
+        };
     }
 }
