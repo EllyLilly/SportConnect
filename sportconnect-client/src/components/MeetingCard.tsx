@@ -64,7 +64,6 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
   const [leaving, setLeaving] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const navigate = useNavigate();
-  console.log('MeetingCard mounted, meetingId:', meeting.id);
   const SIGNALR_URL = import.meta.env.VITE_SIGNALR_URL || 'https://localhost:7055/hubs/meeting';
   const { connection, isConnected, connectionState } = useSignalR(SIGNALR_URL);
 
@@ -94,10 +93,9 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
 
   conn.invoke('JoinMeetingGroup', meeting.id)
   .then(() => {
-    console.log('Joined group successfully');
     onUpdate();
   })
-  .catch((err) => console.error('JoinMeetingGroup error:', err));
+  .catch(() => {});
 
   return () => {
     conn.off('ParticipantJoined');
@@ -144,7 +142,7 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
       showToast('Вы вышли из встречи', 'success');
       onUpdate();
     } catch (err: any) {
-      const message = err.response?.data?.message || 'Ошибка';
+      const message = getErrorMessage(err, 'Ошибка');
       showToast(message, 'error');
     } finally {
       setLeaving(false);
@@ -162,7 +160,7 @@ export default function MeetingCard({ meeting, onClose, onUpdate }: MeetingCardP
       onUpdate();
       onClose();
     } catch (err: any) {
-      const message = err.response?.data?.message || 'Ошибка';
+      const message = getErrorMessage(err, 'Ошибка');
       showToast(message, 'error');
     }
   };

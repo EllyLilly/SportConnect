@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useToast } from '../contexts/ToastContext';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface Sport {
   id: string;
@@ -55,6 +56,7 @@ export default function ProfilePage() {
   const [telegramConnected, setTelegramConnected] = useState(false);
   const [telegramLoading, setTelegramLoading] = useState(false);
   const [telegramTimer, setTelegramTimer] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
   const { showToast } = useToast();
   const navigate = useNavigate();
 
@@ -138,22 +140,24 @@ export default function ProfilePage() {
   };
 
   const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  e.preventDefault();
+  setSaving(true);
 
-    try {
-      await api.put('/profile', {
-        radiusMeters: radius,
-        skillLevel,
-        sportIds: selectedSportIds,
-        city: city || null,
-      });
-      localStorage.removeItem('mapCenter');
-      showToast('Профиль сохранён', 'success');
-    } catch (err: any) {
-      const message = err.response?.data?.message || 'Ошибка сохранения';
-      showToast(message, 'error');
-    }
-  };
+  try {
+    await api.put('/profile', {
+      radiusMeters: radius,
+      skillLevel,
+      sportIds: selectedSportIds,
+      city: city || null,
+    });
+    localStorage.removeItem('mapCenter');
+    showToast('Профиль сохранён', 'success');
+  } catch (err: any) {
+    showToast(getErrorMessage(err, 'Ошибка сохранения'), 'error');
+  } finally {
+    setSaving(false);
+  }
+};
 
   const handleGenerateCode = async () => {
   setTelegramLoading(true);
@@ -406,8 +410,8 @@ export default function ProfilePage() {
   </div>
           
           <div style={{ display: 'flex', gap: 10 }}>
-            <button type="submit" style={{ padding: '10px 20px' }}>
-              Сохранить
+            <button type="submit" disabled={saving} style={{ padding: '10px 20px' }}>
+  {saving ? 'Сохранение...' : 'Сохранить'}
             </button>
             <button
               type="button"

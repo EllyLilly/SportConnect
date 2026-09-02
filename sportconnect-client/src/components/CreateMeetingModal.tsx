@@ -25,6 +25,7 @@ export default function CreateMeetingModal({ lat, lng, onClose, onCreated }: Cre
   const [maxParticipants, setMaxParticipants] = useState(4);
   const [skillLevel, setSkillLevel] = useState('0');
   const [address, setAddress] = useState('');
+  const [loading, setLoading] = useState(false);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -48,6 +49,7 @@ export default function CreateMeetingModal({ lat, lng, onClose, onCreated }: Cre
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setLoading(true);
 
     const localDate = new Date(scheduledAt);
     const utcDate = localDate.toISOString();
@@ -72,6 +74,8 @@ export default function CreateMeetingModal({ lat, lng, onClose, onCreated }: Cre
       onClose();
     } catch (err: any) {
       showToast(getErrorMessage(err, 'Ошибка создания встречи'), 'error');
+  } finally {
+      setLoading(false);
   }
   };
 
@@ -138,8 +142,10 @@ export default function CreateMeetingModal({ lat, lng, onClose, onCreated }: Cre
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button type="submit">Создать</button>
-            <button type="button" onClick={onClose}>Отмена</button>
+            <button type="submit" disabled={loading}>
+              {loading ? 'Создание...' : 'Создать'}
+            </button>
+            <button type="button" onClick={onClose} disabled={loading}>Отмена</button>
           </div>
         </form>
       </div>

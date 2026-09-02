@@ -3,11 +3,11 @@ import { createContext, useContext, useState, type ReactNode, useCallback } from
 interface Toast {
   id: number;
   message: string;
-  type: 'success' | 'error' | 'info';
+  type: 'success' | 'error' | 'info' | 'warning';
 }
 
 interface ToastContextType {
-  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
@@ -17,13 +17,23 @@ let toastId = 0;
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
     const id = ++toastId;
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4000);
   }, []);
+
+  const getBackgroundColor = (type: Toast['type']) => {
+    switch (type) {
+      case 'error': return '#d32f2f';
+      case 'success': return '#388e3c';
+      case 'warning': return '#f57c00';
+      case 'info': return '#1976d2';
+      default: return '#1976d2';
+    }
+  };
 
   return (
     <ToastContext.Provider value={{ showToast }}>
@@ -36,9 +46,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               padding: '12px 20px',
               borderRadius: 8,
               color: '#fff',
-              backgroundColor: toast.type === 'error' ? '#d32f2f' : toast.type === 'success' ? '#388e3c' : '#1976d2',
+              backgroundColor: getBackgroundColor(toast.type),
               boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              maxWidth: 350,
             }}
             onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
           >
