@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useToast } from '../contexts/ToastContext';
 import { getErrorMessage } from '../utils/errorMessage';
+import '../styles/modal.css';
 
 interface Sport {
   id: string;
@@ -37,11 +38,11 @@ export default function EditMeetingModal({ meetingId, onClose, onUpdated }: Edit
     const loadData = async () => {
       try {
         const [sportsRes, meetingRes] = await Promise.all([
-            api.get('/sport'),
-            api.get(`/meetings/${meetingId}`),
+          api.get('/sport'),
+          api.get(`/meetings/${meetingId}`),
         ]);
 
-        setSports(sportsRes.data);
+        setSports(Array.isArray(sportsRes.data) ? sportsRes.data : []);
 
         const m = meetingRes.data;
         setTitle(m.title);
@@ -55,12 +56,11 @@ export default function EditMeetingModal({ meetingId, onClose, onUpdated }: Edit
         setLatitude(m.latitude);
         setLongitude(m.longitude);
 
-        // Конвертация UTC
         const localDate = new Date(m.scheduledAt);
         const offset = localDate.getTimezoneOffset() * 60000;
         const localISO = new Date(localDate.getTime() - offset).toISOString().slice(0, 19);
         setScheduledAt(localISO);
-      } catch (err: any) {
+      } catch {
         showToast('Не удалось загрузить данные встречи', 'error');
         onClose();
       } finally {
@@ -69,7 +69,7 @@ export default function EditMeetingModal({ meetingId, onClose, onUpdated }: Edit
     };
 
     loadData();
-  }, [meetingId]);
+  }, [meetingId, showToast, onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,76 +104,59 @@ export default function EditMeetingModal({ meetingId, onClose, onUpdated }: Edit
       onUpdated();
       onClose();
     } catch (err: any) {
-        showToast(getErrorMessage(err, 'Ошибка при сохранении'), 'error');
-        } finally {
+      showToast(getErrorMessage(err, 'Ошибка при сохранении'), 'error');
+    } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
     return (
-      <div style={{
-        position: 'fixed', inset: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 1002,
-      }}>
-        <div style={{ background: 'white', padding: 24, borderRadius: 12 }}>
-          Загрузка...
+      <div className="modal-overlay">
+        <div className="modal-content">
+          <p className="modal-hint">Загрузка...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0,
-      background: 'rgba(0,0,0,0.5)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 1002,
-    }}>
-      <div style={{
-        background: 'white',
-        borderRadius: 12,
-        padding: 24,
-        width: 420,
-        maxWidth: '90vw',
-        maxHeight: '90vh',
-        overflowY: 'auto',
-      }}>
-        <h2 style={{ marginTop: 0 }}>Редактировать встречу</h2>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-close" onClick={onClose}>✕</button>
+        <h2 className="modal-title">Редактировать встречу</h2>
 
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: 12 }}>
-            <label>Название *</label>
+          <div className="modal-form-group">
+            <label className="modal-label">Название *</label>
             <input
+              className="modal-input"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
               minLength={3}
               maxLength={100}
-              style={{ width: '100%', padding: 8, marginTop: 4 }}
             />
           </div>
 
-          <div style={{ marginBottom: 12 }}>
-            <label>Описание</label>
+          <div className="modal-form-group">
+            <label className="modal-label">Описание</label>
             <textarea
+              className="modal-input"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               maxLength={500}
               rows={3}
-              style={{ width: '100%', padding: 8, marginTop: 4 }}
             />
           </div>
 
-          <div style={{ marginBottom: 12 }}>
-            <label>Вид спорта *</label>
+          <div className="modal-form-group">
+            <label className="modal-label">Вид спорта *</label>
             <select
+              className="modal-input"
               value={sportId}
               onChange={(e) => setSportId(e.target.value)}
               required
-              style={{ width: '100%', padding: 8, marginTop: 4 }}
             >
               <option value="">Выберите вид спорта</option>
               {sports.map((s) => (
@@ -182,49 +165,49 @@ export default function EditMeetingModal({ meetingId, onClose, onUpdated }: Edit
             </select>
           </div>
 
-          <div style={{ marginBottom: 12 }}>
-            <label>Время *</label>
+          <div className="modal-form-group">
+            <label className="modal-label">Время *</label>
             <input
-            type="datetime-local"
-            step="1"
-            value={scheduledAt}
-            onChange={(e) => setScheduledAt(e.target.value)}
-            required
-            style={{ width: '100%', padding: 8, marginTop: 4 }}
+              type="datetime-local"
+              step="1"
+              className="modal-input"
+              value={scheduledAt}
+              onChange={(e) => setScheduledAt(e.target.value)}
+              required
             />
           </div>
 
-          <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label>Мин. участников</label>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div className="modal-form-group" style={{ flex: 1 }}>
+              <label className="modal-label">Мин. участников</label>
               <input
                 type="number"
+                className="modal-input"
                 value={minParticipants}
                 onChange={(e) => setMinParticipants(Number(e.target.value))}
                 min={1}
                 max={30}
-                style={{ width: '100%', padding: 8, marginTop: 4 }}
               />
             </div>
-            <div style={{ flex: 1 }}>
-              <label>Макс. участников</label>
+            <div className="modal-form-group" style={{ flex: 1 }}>
+              <label className="modal-label">Макс. участников</label>
               <input
                 type="number"
+                className="modal-input"
                 value={maxParticipants}
                 onChange={(e) => setMaxParticipants(Number(e.target.value))}
                 min={Math.max(1, currentParticipants)}
                 max={30}
-                style={{ width: '100%', padding: 8, marginTop: 4 }}
               />
             </div>
           </div>
 
-          <div style={{ marginBottom: 12 }}>
-            <label>Уровень</label>
+          <div className="modal-form-group">
+            <label className="modal-label">Уровень</label>
             <select
+              className="modal-input"
               value={requiredSkillLevel}
               onChange={(e) => setRequiredSkillLevel(Number(e.target.value))}
-              style={{ width: '100%', padding: 8, marginTop: 4 }}
             >
               <option value={0}>Любой</option>
               <option value={1}>Новичок</option>
@@ -233,21 +216,21 @@ export default function EditMeetingModal({ meetingId, onClose, onUpdated }: Edit
             </select>
           </div>
 
-          <div style={{ marginBottom: 16 }}>
-            <label>Инвентарь (через запятую)</label>
+          <div className="modal-form-group">
+            <label className="modal-label">Инвентарь (через запятую)</label>
             <input
+              className="modal-input"
               value={inventory}
               onChange={(e) => setInventory(e.target.value)}
               placeholder="Мяч, ракетки, вода"
-              style={{ width: '100%', padding: 8, marginTop: 4 }}
             />
           </div>
 
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button type="submit" disabled={saving} style={{ flex: 1 }}>
+          <div className="modal-buttons">
+            <button type="submit" className="modal-btn" disabled={saving}>
               {saving ? 'Сохранение...' : 'Сохранить'}
             </button>
-            <button type="button" onClick={onClose} disabled={saving}>
+            <button type="button" className="modal-btn-secondary" onClick={onClose} disabled={saving}>
               Отмена
             </button>
           </div>

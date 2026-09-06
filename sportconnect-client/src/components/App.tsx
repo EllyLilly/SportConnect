@@ -7,23 +7,26 @@ import { ToastProvider } from '../contexts/ToastContext';
 import ErrorBoundary from '../components/ErrorBoundary';
 import ProtectedRoute from '../components/ProtectedRoute';
 import ProfilePage from '../pages/ProfilePage';
+import { ThemeProvider } from '../contexts/ThemeContext';
 
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <ErrorBoundary>
-        <ToastProvider>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/map" element={<MapPage />} />
-          <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-          <Route path="/" element={<MapPage />} />
-        </Routes>
-        </ToastProvider>
-        </ErrorBoundary>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <ErrorBoundary>
+          <ToastProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/map" element={<MapPage />} />
+            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+            <Route path="/" element={<MapPage />} />
+          </Routes>
+          </ToastProvider>
+          </ErrorBoundary>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

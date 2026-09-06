@@ -12,6 +12,7 @@ import LoginModal from '../components/LoginModal';
 import '../styles/topbar.css';
 import RegisterModal from '../components/RegisterModal';
 import ProfileModal from '../components/ProfileModal';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface MeetingMarker {
   id: string;
@@ -71,6 +72,7 @@ export default function MapPage() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const { isDark, toggleTheme } = useTheme();
 
   const handleLogout = () => {
     logout();
@@ -397,34 +399,51 @@ const showNoFilteredMeetings = showEmptyState && selectedSports.length > 0;
   </div>
 
   <div className="topbar-user">
-    {user ? (
-      <>
-        <span className="topbar-username" onClick={() => setShowProfileModal(true)} title="Открыть профиль">
-        {user.userName}
-        </span>
-        <button className="topbar-btn" onClick={handleLogout}>Выйти</button>
-      </>
-    ) : (
-      <button className="topbar-btn-primary" onClick={() => setShowLoginModal(true)}>Вход</button>
-    )}
+    <button className="topbar-btn" onClick={toggleTheme} title={isDark ? 'Светлая тема' : 'Тёмная тема'}>
+  {isDark ? '☀️' : '🌙'}
+</button>
+
+      {user ? (
+        <>
+          <span className="topbar-username" onClick={() => setShowProfileModal(true)} title="Открыть профиль">
+            {user.userName}
+          </span>
+          <button className="topbar-btn" onClick={handleLogout}>Выйти</button>
+        </>
+      ) : (
+        <button className="topbar-btn-primary" onClick={() => setShowLoginModal(true)}>Вход</button>
+      )}
     </div>
   </div>
 
-      <YMaps query={{ apikey: import.meta.env.VITE_YANDEX_API_KEY }}>
-        <Map
-          defaultState={{ center: mapCenter, zoom: 12 }}
-          width="100%"
-          height="100%"
-          onClick={handleMapClick}
-          onBoundsChange={handleBoundsChange}
-          instanceRef={(ref) => {
-            mapRef.current = ref;
-            if (ref && pendingCenterRef.current) {
-              ref.setCenter(pendingCenterRef.current, 12);
-              pendingCenterRef.current = null;
-            }
+      <div
+          style={{
+            width: '100%',
+            height: '100%',
+            filter: isDark
+              ? 'invert(90%) hue-rotate(180deg) brightness(0.95) contrast(0.9)'
+              : 'none',
+            transition: 'filter 0.3s',
           }}
         >
+          <YMaps query={{ apikey: import.meta.env.VITE_YANDEX_API_KEY }}>
+            <Map
+              defaultState={{
+                center: mapCenter,
+                zoom: 12,
+              }}
+              width="100%"
+              height="100%"
+              onClick={handleMapClick}
+              onBoundsChange={handleBoundsChange}
+              instanceRef={(ref) => {
+                mapRef.current = ref;
+                if (ref && pendingCenterRef.current) {
+                  ref.setCenter(pendingCenterRef.current, 12);
+                  pendingCenterRef.current = null;
+                }
+              }}
+            >
           <Clusterer
             key={filteredMeetings.length === 0 ? 'empty' : 'full'}
             options={{
@@ -463,6 +482,7 @@ const showNoFilteredMeetings = showEmptyState && selectedSports.length > 0;
           )}
         </Map>
       </YMaps>
+      </div>
 
       {loadingMeetings && (
         <div style={{
