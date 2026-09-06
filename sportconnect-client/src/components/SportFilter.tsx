@@ -18,8 +18,6 @@ export default function SportFilter({ selected, onChange }: SportFilterProps) {
 
   useEffect(() => {
     api.get('/sport').then((response) => {
-      console.log('Response data type:', typeof response.data);
-      console.log('Response data:', response.data);
       const data = Array.isArray(response.data) ? response.data : [];
       setSports(data);
     });
@@ -34,7 +32,7 @@ export default function SportFilter({ selected, onChange }: SportFilterProps) {
   };
 
   return (
-    <div style={{ padding: '10px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
       {sports.map((sport) => (
         <SportBadge
           key={sport.id}

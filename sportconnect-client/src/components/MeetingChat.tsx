@@ -4,20 +4,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { formatMessageTime } from '../utils/formatMessageTime';
 import { HubConnection, HubConnectionState } from '@microsoft/signalr';
-import './MeetingChat.css';
+import '../styles/meeting-chat.css';
 
 function invokeWithTimeout<T>(promise: Promise<T>, ms = 8000): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
   const timeout = new Promise<T>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error('Timeout: нет ответа от сервера')),
-      ms,
-    );
+    timer = setTimeout(() => reject(new Error('Timeout: нет ответа от сервера')), ms);
   });
-  return Promise.race([
-    promise.finally(() => clearTimeout(timer)),
-    timeout,
-  ]);
+  return Promise.race([promise.finally(() => clearTimeout(timer)), timeout]);
 }
 
 interface ChatMessage {
@@ -35,6 +29,17 @@ interface MeetingChatProps {
   connection: React.MutableRefObject<HubConnection | null>;
   isConnected: boolean;
   connectionState: HubConnectionState;
+  resizeHandle: {
+    dragging: boolean;
+    onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
+    onPointerMove: (event: React.PointerEvent<HTMLDivElement>) => void;
+    onPointerUp: (event: React.PointerEvent<HTMLDivElement>) => void;
+    onDoubleClick: () => void;
+    onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+    valueNow: number;
+    valueMin: number;
+    valueMax: number;
+  };
 }
 
 export default function MeetingChat({
@@ -43,39 +48,12 @@ export default function MeetingChat({
   connection,
   isConnected,
   connectionState,
+  resizeHandle,
 }: MeetingChatProps) {
   const { user, isAuthenticated } = useAuth();
   const { showToast } = useToast();
 
   const [online, setOnline] = useState(navigator.onLine);
-
-  useEffect(() => {
-  const onOffline = () => {
-    setOnline(false);
-    showToast('Нет соединения', 'error');
-  };
-  const onOnline = () => {
-    setOnline(true);
-  };
-  window.addEventListener('offline', onOffline);
-  window.addEventListener('online', onOnline);
-  return () => {
-    window.removeEventListener('offline', onOffline);
-    window.removeEventListener('online', onOnline);
-  };
-}, []);
-
-    useEffect(() => {
-    const goOffline = () => setOnline(false);
-    const goOnline = () => setOnline(true);
-    window.addEventListener('offline', goOffline);
-    window.addEventListener('online', goOnline);
-    return () => {
-        window.removeEventListener('offline', goOffline);
-        window.removeEventListener('online', goOnline);
-    };
-    }, []);
-
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -84,14 +62,27 @@ export default function MeetingChat({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Загрузка истории
+  useEffect(() => {
+    const onOffline = () => {
+      setOnline(false);
+      showToast('Нет соединения', 'error');
+    };
+    const onOnline = () => setOnline(true);
+    window.addEventListener('offline', onOffline);
+    window.addEventListener('online', onOnline);
+    return () => {
+      window.removeEventListener('offline', onOffline);
+      window.removeEventListener('online', onOnline);
+    };
+  }, [showToast]);
+
   useEffect(() => {
     const loadHistory = async () => {
       try {
         const response = await api.get(`/meetings/${meetingId}/messages`);
-        setMessages(response.data);
-      } catch (err: any) {
-        console.error('Failed to load message history:', err);
+        const data = Array.isArray(response.data) ? response.data : [];
+        setMessages(data);
+      } catch {
         showToast('Не удалось загрузить историю сообщений', 'error');
       } finally {
         setLoadingHistory(false);
@@ -103,12 +94,10 @@ export default function MeetingChat({
     } else {
       setLoadingHistory(false);
     }
-  }, [meetingId, isAuthenticated, isConnected]);
+  }, [meetingId, isAuthenticated, isConnected, showToast]);
 
-  // Подписка на новые сообщения
   useEffect(() => {
     if (!isConnected) return;
-
     const conn = connection.current;
     if (!conn) return;
 
@@ -124,55 +113,52 @@ export default function MeetingChat({
     };
   }, [isConnected, meetingId, connection]);
 
-  // Автоскролл вниз при новых сообщениях
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleSend = async () => {
-  const content = newMessage.trim();
-  if (!content || sending) return;
+    const content = newMessage.trim();
+    if (!content || sending) return;
 
-  if (!navigator.onLine) {
-    showToast('Нет соединения. Сообщение не отправлено.', 'error');
-    return;
-  }
-
-  const conn = connection.current;
-  const live = conn?.state === HubConnectionState.Connected;
-
-  if (!conn || !live) {
-    showToast('Чат не подключён', 'error');
-    return;
-  }
-
-  setSending(true);
-  try {
-    await invokeWithTimeout(conn.invoke('SendMessage', meetingId, content));
-    setNewMessage('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err ?? '');
-    if (message.includes('Слишком много')) {
-      showToast('Слишком много сообщений. Подождите минуту.', 'error');
-    } else if (
-      message.includes('Timeout') ||
-      message.includes('Failed to fetch') ||
-      message.includes('connection') ||
-      !navigator.onLine
-    ) {
+    if (!navigator.onLine) {
       showToast('Нет соединения. Сообщение не отправлено.', 'error');
-    } else {
-      showToast('Не удалось отправить сообщение', 'error');
+      return;
     }
-  } finally {
-    setSending(false);
-  }
-};
+
+    const conn = connection.current;
+    const live = conn?.state === HubConnectionState.Connected;
+
+    if (!conn || !live) {
+      showToast('Чат не подключён', 'error');
+      return;
+    }
+
+    setSending(true);
+    try {
+      await invokeWithTimeout(conn.invoke('SendMessage', meetingId, content));
+      setNewMessage('');
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err ?? '');
+      if (message.includes('Слишком много')) {
+        showToast('Слишком много сообщений. Подождите минуту.', 'error');
+      } else if (
+        message.includes('Timeout') ||
+        message.includes('Failed to fetch') ||
+        message.includes('connection') ||
+        !navigator.onLine
+      ) {
+        showToast('Нет соединения. Сообщение не отправлено.', 'error');
+      } else {
+        showToast('Не удалось отправить сообщение', 'error');
+      }
+    } finally {
+      setSending(false);
+    }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -187,90 +173,130 @@ export default function MeetingChat({
     e.target.style.height = e.target.scrollHeight + 'px';
   };
 
-    const dotColor = !online
-  ? '#f44336'
-  : connectionState === HubConnectionState.Connected
-    ? '#4CAF50'
-    : connectionState === HubConnectionState.Reconnecting ||
-      connectionState === HubConnectionState.Connecting
-      ? '#FFC107'
-      : '#f44336';
+  const dotColor = !online
+    ? '#BF0603'
+    : connectionState === HubConnectionState.Connected
+      ? '#708D81'
+      : connectionState === HubConnectionState.Reconnecting ||
+        connectionState === HubConnectionState.Connecting
+        ? '#F4D58D'
+        : '#BF0603';
 
-    const dotTitle =
+  const dotTitle =
     connectionState === HubConnectionState.Connected
-        ? 'Подключено'
-        : connectionState === HubConnectionState.Reconnecting ||
+      ? 'Подключено'
+      : connectionState === HubConnectionState.Reconnecting ||
         connectionState === HubConnectionState.Connecting
         ? 'Переподключение'
         : 'Нет соединения';
 
   if (!isAuthenticated) {
+    return (
+      <div className="meeting-chat">
+        <div
+          className={`chat-resize-handle${resizeHandle.dragging ? ' is-dragging' : ''}`}
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Изменить высоту чата"
+          aria-valuemin={resizeHandle.valueMin}
+          aria-valuemax={resizeHandle.valueMax}
+          aria-valuenow={resizeHandle.valueNow}
+          tabIndex={0}
+          onPointerDown={resizeHandle.onPointerDown}
+          onPointerMove={resizeHandle.onPointerMove}
+          onPointerUp={resizeHandle.onPointerUp}
+          onPointerCancel={resizeHandle.onPointerUp}
+          onDoubleClick={resizeHandle.onDoubleClick}
+          onKeyDown={resizeHandle.onKeyDown}
+        >
+          <span className="chat-resize-grip" />
+        </div>
+        <p className="chat-placeholder">Войдите, чтобы видеть чат встречи</p>
+      </div>
+    );
+  }
+
   return (
     <div className="meeting-chat">
-      <p className="chat-placeholder">Войдите, чтобы видеть чат встречи</p>
+      <div
+        className={`chat-resize-handle${resizeHandle.dragging ? ' is-dragging' : ''}`}
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Изменить высоту чата"
+        aria-valuemin={resizeHandle.valueMin}
+        aria-valuemax={resizeHandle.valueMax}
+        aria-valuenow={resizeHandle.valueNow}
+        tabIndex={0}
+        onPointerDown={resizeHandle.onPointerDown}
+        onPointerMove={resizeHandle.onPointerMove}
+        onPointerUp={resizeHandle.onPointerUp}
+        onPointerCancel={resizeHandle.onPointerUp}
+        onDoubleClick={resizeHandle.onDoubleClick}
+        onKeyDown={resizeHandle.onKeyDown}
+      >
+        <span className="chat-resize-grip" />
+      </div>
+
+      <div className="chat-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span
+            title={dotTitle}
+            style={{
+              display: 'inline-block',
+              width: 10,
+              height: 10,
+              borderRadius: '50%',
+              background: dotColor,
+            }}
+          />
+          <span>Чат встречи</span>
+        </div>
+        {isReadOnly && <span className="chat-readonly">Только чтение</span>}
+      </div>
+
+      <div className="chat-messages">
+        {loadingHistory ? (
+          <p className="chat-placeholder">Загрузка сообщений...</p>
+        ) : messages.length === 0 ? (
+          <p className="chat-placeholder">Сообщений пока нет</p>
+        ) : (
+          messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`chat-message ${msg.userId === user?.id ? 'own' : ''}`}
+            >
+              <div className="chat-message-header">
+                <strong>{msg.userName}</strong>
+                <span>{formatMessageTime(msg.sentAt)}</span>
+              </div>
+              <div className="chat-message-content">{msg.content}</div>
+            </div>
+          ))
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {!isReadOnly && (
+        <div className="chat-input-area">
+          <textarea
+            ref={textareaRef}
+            value={newMessage}
+            onChange={handleInput}
+            onKeyDown={handleKeyDown}
+            placeholder="Написать сообщение... (Enter — отправить)"
+            rows={1}
+            disabled={sending || !isConnected}
+          />
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={sending || !isConnected || !newMessage.trim()}
+            aria-label="Отправить"
+          >
+            {sending ? '...' : '➤'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
-
-return (
-  <div className="meeting-chat">
-    <div className="chat-header">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span
-          title={dotTitle}
-          style={{
-            display: 'inline-block',
-            width: 10,
-            height: 10,
-            borderRadius: '50%',
-            background: dotColor,
-          }}
-        />
-        <span>Чат встречи</span>
-      </div>
-      {isReadOnly && <span className="chat-readonly">Только чтение</span>}
-    </div>
-
-    <div className="chat-messages">
-      {loadingHistory ? (
-        <p className="chat-placeholder">Загрузка сообщений...</p>
-      ) : messages.length === 0 ? (
-        <p className="chat-placeholder">Сообщений пока нет</p>
-      ) : (
-        messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`chat-message ${msg.userId === user?.id ? 'own' : ''}`}
-          >
-            <div className="chat-message-header">
-              <strong>{msg.userName}</strong>
-              <span>{formatMessageTime(msg.sentAt)}</span>
-            </div>
-            <div className="chat-message-content">{msg.content}</div>
-          </div>
-        ))
-      )}
-      <div ref={messagesEndRef} />
-    </div>
-
-    {!isReadOnly && (
-      <div className="chat-input-area">
-        <textarea
-          ref={textareaRef}
-          value={newMessage}
-          onChange={handleInput}
-          onKeyDown={handleKeyDown}
-          placeholder="Написать сообщение... (Enter — отправить)"
-          rows={1}
-          disabled={sending || !isConnected}
-        />
-        <button
-          onClick={handleSend}
-          disabled={sending || !isConnected || !newMessage.trim()}
-        >
-          {sending ? '...' : '➤'}
-        </button>
-      </div>
-    )}
-  </div>
-); }

@@ -8,6 +8,10 @@ import api from '../api/axios';
 import { useToast } from '../contexts/ToastContext';
 import MeetingCard from '../components/MeetingCard';
 import { useLocation } from 'react-router-dom';
+import LoginModal from '../components/LoginModal';
+import '../styles/topbar.css';
+import RegisterModal from '../components/RegisterModal';
+import ProfileModal from '../components/ProfileModal';
 
 interface MeetingMarker {
   id: string;
@@ -62,6 +66,9 @@ export default function MapPage() {
   const pendingCenterRef = useRef<[number, number] | null>(null);
   const requestIdRef = useRef(0);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -284,14 +291,14 @@ export default function MapPage() {
 
   const getPresetByColor = (color: string) => {
     const colorMap: Record<string, string> = {
-      '#4CAF50': 'islands#greenIcon',
-      '#2196F3': 'islands#blueIcon',
-      '#FF9800': 'islands#orangeIcon',
-      '#9C27B0': 'islands#violetIcon',
-      '#00BCD4': 'islands#cyanIcon',
-      '#FF5722': 'islands#redIcon',
-      '#E91E63': 'islands#pinkIcon',
-      '#795548': 'islands#brownIcon',
+      '#708D81': 'islands#darkGreenIcon',
+      '#B56576': 'islands#violetIcon',
+      '#E56B6F': 'islands#redIcon',
+      '#EAAC8B': 'islands#orangeIcon',
+      '#F4D58D': 'islands#yellowIcon',
+      '#DD6E42': 'islands#darkOrangeIcon',
+      '#6D597A': 'islands#magentaIcon',
+      '#4F6D7A': 'islands#blueIcon',
     };
     return colorMap[color] || 'islands#blueIcon';
   };
@@ -323,6 +330,12 @@ export default function MapPage() {
     }
   };
 
+  useEffect(() => {
+  const handleOpenLogin = () => setShowLoginModal(true);
+  window.addEventListener('open-login-modal', handleOpenLogin);
+  return () => window.removeEventListener('open-login-modal', handleOpenLogin);
+  }, []);
+
   const showEmptyState =
     !loadingMeetings &&
     meetings.length === 0 &&
@@ -332,75 +345,56 @@ export default function MapPage() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
-      <div style={{
-        position: 'absolute',
-        top: 10,
-        left: 10,
-        zIndex: 100,
-        background: 'white',
-        padding: '10px',
-        borderRadius: '8px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-      }}>
+      <div className="topbar">
+  <div className="topbar-city" style={{ position: 'relative' }}>
+    <input
+      type="text"
+      className="topbar-input"
+      value={citySearch}
+      placeholder="Введите город"
+      onChange={(e) => handleCitySearch(e.target.value)}
+      onKeyDown={handleCityKeyDown}
+    />
+    <button className="topbar-btn" onClick={handleGeolocate} title="Моё местоположение">
+      ⚲
+    </button>
 
-        <input
-          type="text"
-          value={citySearch}
-          placeholder="Введите город"
-          onChange={(e) => handleCitySearch(e.target.value)}
-          onKeyDown={handleCityKeyDown}
-          style={{ padding: '6px 10px', marginRight: 8, width: 150 }}
-        />
-
-        {citySuggestions.length > 0 && (
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            background: 'white',
-            border: '1px solid #ddd',
-            borderRadius: 4,
-            maxHeight: 200,
-            overflowY: 'auto',
-            zIndex: 100,
-          }}>
-            {citySuggestions.map((s, index) => (
-              <div
-                key={s}
-                onClick={() => handleCitySelect(s)}
-                style={{
-                  padding: '8px 12px',
-                  cursor: 'pointer',
-                  background: index === selectedSuggestionIndex ? '#e3f2fd' : 'white',
-                }}
-                onMouseEnter={(e) => {
-                  setSelectedSuggestionIndex(index);
-                  e.currentTarget.style.background = '#f5f5f5';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = index === selectedSuggestionIndex ? '#e3f2fd' : 'white';
-                }}
-              >
-                {s}
-              </div>
-            ))}
+    {citySuggestions.length > 0 && (
+      <div className="topbar-suggestions">
+        {citySuggestions.map((s, index) => (
+          <div
+            key={s}
+            className="topbar-suggestion"
+            onClick={() => handleCitySelect(s)}
+            onMouseEnter={() => setSelectedSuggestionIndex(index)}
+            style={{
+              background: index === selectedSuggestionIndex ? 'rgba(244, 213, 141, 0.15)' : 'transparent',
+            }}
+          >
+            {s}
           </div>
-        )}
-
-        <button onClick={handleGeolocate} style={{ marginLeft: 10 }}>📍</button>
-        {user ? (
-          <>
-            <span>{user.userName}</span>
-            <button onClick={() => navigate('/profile')} style={{ marginLeft: 10, marginRight: 10 }}>Профиль</button>
-            <button onClick={handleLogout} style={{ marginLeft: 10 }}>Выйти</button>
-          </>
-        ) : (
-          <button onClick={() => navigate('/login')} style={{ marginLeft: 10 }}>Вход</button>
-        )}
+        ))}
       </div>
+    )}
+  </div>
 
-      <SportFilter selected={selectedSports} onChange={setSelectedSports} />
+  <div className="topbar-sports">
+    <SportFilter selected={selectedSports} onChange={setSelectedSports} />
+  </div>
+
+  <div className="topbar-user">
+    {user ? (
+      <>
+        <span className="topbar-username" onClick={() => setShowProfileModal(true)} title="Открыть профиль">
+        {user.userName}
+        </span>
+        <button className="topbar-btn" onClick={handleLogout}>Выйти</button>
+      </>
+    ) : (
+      <button className="topbar-btn-primary" onClick={() => setShowLoginModal(true)}>Вход</button>
+    )}
+    </div>
+  </div>
 
       <YMaps query={{ apikey: import.meta.env.VITE_YANDEX_API_KEY }}>
         <Map
@@ -515,6 +509,38 @@ export default function MapPage() {
           </p>
         </div>
       )}
+          {showLoginModal && (
+        <LoginModal
+          onClose={() => setShowLoginModal(false)}
+          onSwitchToRegister={() => {
+            setShowLoginModal(false);
+            setShowRegisterModal(true);
+          }}
+        />
+      )}
+            {showRegisterModal && (
+        <RegisterModal
+          onClose={() => setShowRegisterModal(false)}
+          onSwitchToLogin={() => {
+            setShowRegisterModal(false);
+            setShowLoginModal(true);
+          }}
+        />
+        )}
+
+        {showProfileModal && (
+      <ProfileModal
+        onClose={() => setShowProfileModal(false)}
+        onNavigateToMeeting={(lat, lng) => {
+          setMapCenter([lat, lng]);
+          pendingCenterRef.current = [lat, lng];
+          if (mapRef.current) {
+            mapRef.current.setCenter([lat, lng], 12);
+            pendingCenterRef.current = null;
+          }
+        }}
+      />
+    )}
     </div>
   );
 }
