@@ -20,6 +20,7 @@ interface MeetingMarker {
   longitude: number;
   sportColor: string;
   sportName: string;
+  sportId: string;
   participantsCount: number;
   maxParticipants: number;
   scheduledAt: string;
@@ -54,6 +55,7 @@ export default function MapPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [selectedSports, setSelectedSports] = useState<string[]>([]);
+  const [filteredMeetings, setFilteredMeetings] = useState<MeetingMarker[]>([]);
 
   const [tempMarker, setTempMarker] = useState<[number, number] | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -94,6 +96,7 @@ export default function MapPage() {
       if (id !== requestIdRef.current) return;
       const list = Array.isArray(res.data) ? res.data : [];
       setMeetings(list);
+      setFilteredMeetings(list);
     } catch (error) {
       if (id !== requestIdRef.current) return;
       console.error('Ошибка загрузки встреч:', error);
@@ -282,6 +285,15 @@ export default function MapPage() {
     loadUserCity();
   }, [location.pathname, location.state]);
 
+  useEffect(() => {
+  if (selectedSports.length === 0) {
+    setFilteredMeetings(meetings);
+  } else {
+    const filtered = meetings.filter((m) => selectedSports.includes(m.sportId));
+    setFilteredMeetings(filtered);
+  }
+  }, [selectedSports, meetings]);
+
   const handleMeetingCreated = () => {
     const bounds = mapRef.current?.getBounds?.();
     if (bounds) {
@@ -338,10 +350,12 @@ export default function MapPage() {
 
   const showEmptyState =
     !loadingMeetings &&
-    meetings.length === 0 &&
+    filteredMeetings.length === 0 &&
     !showModal &&
     !selectedMeeting &&
     !tempMarker;
+
+const showNoFilteredMeetings = showEmptyState && selectedSports.length > 0;
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
@@ -412,13 +426,13 @@ export default function MapPage() {
           }}
         >
           <Clusterer
-            key={meetings.length === 0 ? 'empty' : 'full'}
+            key={filteredMeetings.length === 0 ? 'empty' : 'full'}
             options={{
               preset: 'islands#invertedVClusterIcons',
               groupByCoordinates: false,
             }}
           >
-            {meetings.map((m) => (
+            {filteredMeetings.map((m) => (
               <Placemark
                 key={m.id}
                 geometry={[m.latitude, m.longitude]}
@@ -494,19 +508,36 @@ export default function MapPage() {
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          background: 'white',
+          background: 'rgba(0, 20, 39, 0.9)',
           padding: '24px',
           borderRadius: 12,
-          boxShadow: '0 2px 16px rgba(0,0,0,0.2)',
+          boxShadow: '0 2px 16px rgba(0, 0, 0, 0.3)',
+          border: '1px solid rgba(244, 213, 141, 0.2)',
           zIndex: 150,
           textAlign: 'center',
           maxWidth: 300,
+          color: '#f4d58d',
         }}>
           <div style={{ fontSize: 40, marginBottom: 8 }}>🏀</div>
-          <p style={{ fontWeight: 'bold', marginBottom: 4 }}>Здесь пока нет встреч</p>
-          <p style={{ color: '#666', fontSize: 14, marginBottom: 16 }}>
-            Нажмите по карте для создания первой встречи
-          </p>
+          {showNoFilteredMeetings ? (
+            <>
+              <p style={{ fontWeight: 'bold', marginBottom: 4, color: '#f4d58d' }}>
+                Встреч по выбранным видам спорта пока нет
+              </p>
+              <p style={{ color: 'rgba(244, 213, 141, 0.7)', fontSize: 14, marginBottom: 16 }}>
+                Выберите другие виды спорта или создайте встречу сами
+              </p>
+            </>
+          ) : (
+            <>
+              <p style={{ fontWeight: 'bold', marginBottom: 4, color: '#f4d58d' }}>
+                Здесь пока нет встреч
+              </p>
+              <p style={{ color: 'rgba(244, 213, 141, 0.7)', fontSize: 14, marginBottom: 16 }}>
+                Нажмите по карте для создания первой встречи
+              </p>
+            </>
+          )}
         </div>
       )}
           {showLoginModal && (

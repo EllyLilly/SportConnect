@@ -16,6 +16,7 @@ namespace SportConnect.Core.DTOs.Meetings
         public double Longitude { get; set; }
         public DateTime ScheduledAt { get; set; }
         public MeetingStatus Status { get; set; }
+        public Guid SportId { get; set; }
         public string SportName { get; set; } = string.Empty;
         public string SportColor { get; set; } = string.Empty;
         public int ParticipantsCount { get; set; }
